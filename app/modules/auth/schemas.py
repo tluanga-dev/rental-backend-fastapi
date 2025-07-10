@@ -51,6 +51,7 @@ class LoginResponse(BaseModel):
 
 class RegisterRequest(BaseModel):
     """User registration request schema"""
+    username: str = Field(..., min_length=3, max_length=50, description="Unique username")
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., min_length=8, description="User password")
     full_name: str = Field(..., min_length=1, max_length=255, description="User full name")
@@ -71,6 +72,7 @@ class RegisterRequest(BaseModel):
     model_config = {
         "json_schema_extra": {
             "example": {
+                "username": "johndoe",
                 "email": "newuser@example.com",
                 "password": "SecurePassword123",
                 "full_name": "John Doe"

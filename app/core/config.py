@@ -21,6 +21,7 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://fastapi_user:fastapi_password@localhost:5432/fastapi_db",
         env="DATABASE_URL"
     )
+    DATABASE_ECHO: bool = Field(default=False, env="DATABASE_ECHO")
     
     # Redis Settings
     REDIS_URL: str = Field(

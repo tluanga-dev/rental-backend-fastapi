@@ -32,12 +32,17 @@ class AuthService:
         self.db = db
         self.user_service = UserService(db)
     
-    async def register(self, email: str, password: str, full_name: str) -> User:
+    async def register(self, username: str, email: str, password: str, full_name: str) -> User:
         """Register a new user"""
         # Check if user already exists
         existing_user = await self.user_service.get_by_email(email)
         if existing_user:
             raise AlreadyExistsError("User", "email", email)
+        
+        # Check if username already exists
+        existing_username = await self.user_service.get_by_username(username)
+        if existing_username:
+            raise AlreadyExistsError("User", "username", username)
         
         # Validate password
         if len(password) < settings.PASSWORD_MIN_LENGTH:
@@ -45,8 +50,9 @@ class AuthService:
         
         # Create user
         user_data = {
+            "username": username,
             "email": email,
-            "password": get_password_hash(password),
+            "password": password,  # UserService will hash this
             "full_name": full_name,
             "is_active": True
         }

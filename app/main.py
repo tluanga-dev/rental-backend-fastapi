@@ -5,10 +5,34 @@ import uvicorn
 import logging
 
 from app.core.config import settings
-from app.core.database import engine, Base
+from app.core.database import engine
+from app.db.base import Base
 from app.shared.exceptions import CustomHTTPException
+
+# Import all models to ensure they are registered with Base.metadata
+from app.modules.users.models import User, UserProfile, UserRole, UserRoleAssignment
+from app.modules.auth.models import RefreshToken, LoginAttempt, PasswordResetToken
+from app.modules.master_data.brands.models import Brand
+from app.modules.master_data.categories.models import Category
+from app.modules.master_data.locations.models import Location
+from app.modules.master_data.units.models import UnitOfMeasurement
+from app.modules.suppliers.models import Supplier
+from app.modules.customers.models import Customer
+from app.modules.inventory.models import Item, InventoryUnit, StockLevel
+from app.modules.transactions.models import TransactionHeader, TransactionLine
+from app.modules.rentals.models import RentalReturn, RentalReturnLine, InspectionReport
+from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
+from app.modules.system.models import SystemSetting, SystemBackup, AuditLog
 from app.modules.auth.routes import router as auth_router
 from app.modules.users.routes import router as users_router
+from app.modules.master_data.routes import router as master_data_router
+from app.modules.suppliers.routes import router as suppliers_router
+from app.modules.customers.routes import router as customers_router
+from app.modules.inventory.routes import router as inventory_router
+from app.modules.transactions.routes import router as transactions_router
+from app.modules.rentals.routes import router as rentals_router
+from app.modules.analytics.routes import router as analytics_router
+from app.modules.system.routes import router as system_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -49,6 +73,17 @@ async def health_check():
 # Include routers
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(users_router, prefix="/api/users", tags=["Users"])
+app.include_router(master_data_router, prefix="/api/master-data", tags=["Master Data"])
+app.include_router(suppliers_router, prefix="/api/suppliers", tags=["Suppliers"])
+app.include_router(customers_router, prefix="/api/customers", tags=["Customers"])
+app.include_router(inventory_router, prefix="/api/inventory", tags=["Inventory"])
+app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions"])
+app.include_router(rentals_router, prefix="/api/rentals", tags=["Rentals"])
+app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(system_router, prefix="/api/system", tags=["System"])
+
+# API v1 routes (for backward compatibility)
+app.include_router(suppliers_router, prefix="/api/v1/suppliers", tags=["Suppliers V1"])
 
 # Startup event
 @app.on_event("startup")

@@ -11,12 +11,28 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import your models here to ensure they are registered with SQLAlchemy
-from app.core.database import Base
+from app.db.base import Base
 from app.core.config import settings
 
+# Import UUIDType for migration compatibility
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # Import all models to ensure they are registered
-from app.modules.users.models import User
-from app.modules.auth.models import RefreshToken
+from app.modules.users.models import User, UserProfile, UserRole, UserRoleAssignment
+from app.modules.auth.models import RefreshToken, LoginAttempt, PasswordResetToken
+from app.modules.master_data.brands.models import Brand
+from app.modules.master_data.categories.models import Category
+from app.modules.master_data.locations.models import Location
+from app.modules.master_data.units.models import UnitOfMeasurement
+from app.modules.suppliers.models import Supplier
+from app.modules.customers.models import Customer
+from app.modules.inventory.models import Item, InventoryUnit, StockLevel
+from app.modules.transactions.models import TransactionHeader, TransactionLine
+from app.modules.rentals.models import RentalReturn, RentalReturnLine, InspectionReport
+from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
+from app.modules.system.models import SystemSetting, SystemBackup, AuditLog
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

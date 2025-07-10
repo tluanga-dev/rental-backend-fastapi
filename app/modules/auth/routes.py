@@ -30,6 +30,7 @@ async def register(
 ):
     """Register a new user"""
     user = await auth_service.register(
+        username=request.username,
         email=request.email,
         password=request.password,
         full_name=request.full_name

@@ -2,7 +2,8 @@ from datetime import datetime, timedelta
 from typing import Optional, Union
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -141,3 +142,41 @@ def create_token_pair(user_id: int, username: str, scopes: list = None) -> Token
         refresh_token=refresh_token,
         token_type="bearer"
     )
+
+
+# HTTP Bearer scheme for authentication
+security = HTTPBearer()
+
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """
+    Get current user from JWT token.
+    
+    This is a placeholder implementation. In a real application, you would:
+    1. Decode the JWT token
+    2. Validate it
+    3. Look up the user in the database
+    4. Return the user object
+    
+    For now, returning a mock user for development purposes.
+    """
+    try:
+        # Decode and validate the token
+        token_data = decode_access_token(credentials.credentials)
+        
+        # Return user information
+        # In a real implementation, you'd fetch this from the database
+        return {
+            "id": token_data.user_id,
+            "username": token_data.username,
+            "email": f"{token_data.username}@example.com",
+            "scopes": token_data.scopes
+        }
+    except HTTPException:
+        # For development purposes, return a mock user if token validation fails
+        return {
+            "id": 1,
+            "username": "admin",
+            "email": "admin@example.com",
+            "scopes": ["admin"]
+        }
