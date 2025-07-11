@@ -7,7 +7,8 @@ import json
 
 from app.core.security import get_password_hash, verify_password
 from app.shared.exceptions import NotFoundError, AlreadyExistsError, ValidationError
-from app.modules.users.models import User, UserProfile, UserRole, UserRoleAssignment
+from app.modules.users.models import User, UserProfile
+from app.modules.auth.models import Role, Permission, user_roles_table
 from app.core.dependencies import PaginationParams
 
 
@@ -219,41 +220,50 @@ class UserRoleService:
     def __init__(self, db: AsyncSession):
         self.db = db
     
-    async def create_role(self, role_data: Dict[str, Any]) -> UserRole:
+    async def create_role(self, role_data: Dict[str, Any]) -> Role:
         """Create a new role"""
         # Check if role already exists
         existing_role = await self.get_role_by_name(role_data["name"])
         if existing_role:
             raise AlreadyExistsError("Role", "name", role_data["name"])
         
-        # Convert permissions list to JSON string
-        if "permissions" in role_data:
-            role_data["permissions"] = json.dumps(role_data["permissions"])
+        # Remove permissions from role_data as we handle them separately
+        permissions_list = role_data.pop("permissions", [])
         
-        role = UserRole(**role_data)
+        role = Role(**role_data)
+        
+        # Add permissions to role if provided
+        if permissions_list:
+            for perm_name in permissions_list:
+                stmt = select(Permission).where(Permission.name == perm_name)
+                result = await self.db.execute(stmt)
+                permission = result.scalar_one_or_none()
+                if permission:
+                    role.permissions.append(permission)
+        
         self.db.add(role)
         await self.db.commit()
         await self.db.refresh(role)
         return role
     
-    async def get_role_by_id(self, role_id: int) -> Optional[UserRole]:
+    async def get_role_by_id(self, role_id: int) -> Optional[Role]:
         """Get role by ID"""
-        stmt = select(UserRole).where(UserRole.id == role_id)
+        stmt = select(Role).where(Role.id == role_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
     
-    async def get_role_by_name(self, name: str) -> Optional[UserRole]:
+    async def get_role_by_name(self, name: str) -> Optional[Role]:
         """Get role by name"""
-        stmt = select(UserRole).where(UserRole.name == name)
+        stmt = select(Role).where(Role.name == name)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
     
-    async def get_all_roles(self, pagination: PaginationParams) -> tuple[List[UserRole], int]:
+    async def get_all_roles(self, pagination: PaginationParams) -> tuple[List[Role], int]:
         """Get all roles with pagination"""
-        query = select(UserRole)
+        query = select(Role)
         
         # Get total count
-        count_query = select(func.count()).select_from(UserRole)
+        count_query = select(func.count()).select_from(Role)
         total = await self.db.execute(count_query)
         total = total.scalar()
         
@@ -265,67 +275,83 @@ class UserRoleService:
         
         return roles, total
     
-    async def assign_role(self, user_id: int, role_id: int, assigned_by: Optional[int] = None) -> UserRoleAssignment:
-        """Assign role to user"""
+    async def assign_role(self, user_id: int, role_id: int, assigned_by: Optional[int] = None) -> dict:
+        """Assign role to user - Updated for new RBAC system"""
+        # Get user and role
+        user = await self.db.get(User, user_id)
+        role = await self.db.get(Role, role_id)
+        
+        if not user or not role:
+            raise NotFoundError("User or Role", f"user_id={user_id}, role_id={role_id}")
+        
         # Check if assignment already exists
-        existing_assignment = await self.get_user_role_assignment(user_id, role_id)
-        if existing_assignment:
+        if role in user.roles:
             raise AlreadyExistsError("Role assignment", "user_id and role_id", f"{user_id},{role_id}")
         
-        assignment = UserRoleAssignment(
-            user_id=user_id,
-            role_id=role_id,
-            assigned_by=assigned_by
-        )
-        
-        self.db.add(assignment)
+        # Add role to user
+        user.roles.append(role)
         await self.db.commit()
-        await self.db.refresh(assignment)
-        return assignment
+        
+        return {"user_id": user_id, "role_id": role_id, "assigned": True}
     
     async def remove_role(self, user_id: int, role_id: int) -> bool:
-        """Remove role from user"""
-        assignment = await self.get_user_role_assignment(user_id, role_id)
-        if not assignment:
+        """Remove role from user - Updated for new RBAC system"""
+        # Get user and role
+        user = await self.db.get(User, user_id)
+        role = await self.db.get(Role, role_id)
+        
+        if not user or not role:
+            raise NotFoundError("User or Role", f"user_id={user_id}, role_id={role_id}")
+        
+        # Check if assignment exists
+        if role not in user.roles:
             raise NotFoundError("Role assignment", f"user_id={user_id}, role_id={role_id}")
         
-        await self.db.delete(assignment)
+        # Remove role from user
+        user.roles.remove(role)
         await self.db.commit()
         return True
     
-    async def get_user_role_assignment(self, user_id: int, role_id: int) -> Optional[UserRoleAssignment]:
-        """Get user role assignment"""
-        stmt = select(UserRoleAssignment).where(
-            and_(
-                UserRoleAssignment.user_id == user_id,
-                UserRoleAssignment.role_id == role_id
-            )
-        )
-        result = await self.db.execute(stmt)
-        return result.scalar_one_or_none()
+    async def get_user_role_assignment(self, user_id: int, role_id: int) -> Optional[dict]:
+        """Get user role assignment - Updated for new RBAC system"""
+        # Get user and role
+        user = await self.db.get(User, user_id)
+        role = await self.db.get(Role, role_id)
+        
+        if not user or not role:
+            return None
+        
+        # Check if assignment exists
+        if role in user.roles:
+            return {"user_id": user_id, "role_id": role_id, "assigned": True}
+        
+        return None
     
-    async def get_user_roles(self, user_id: int) -> List[UserRole]:
+    async def get_user_roles(self, user_id: int) -> List[Role]:
         """Get all roles for a user"""
         stmt = (
-            select(UserRole)
-            .join(UserRoleAssignment)
-            .where(UserRoleAssignment.user_id == user_id)
-            .where(UserRole.is_active == True)
+            select(Role)
+            .join(user_roles_table)
+            .where(user_roles_table.c.user_id == user_id)
+            .where(Role.is_active == True)
         )
         result = await self.db.execute(stmt)
         return result.scalars().all()
     
     async def get_user_permissions(self, user_id: int) -> List[str]:
         """Get all permissions for a user"""
-        roles = await self.get_user_roles(user_id)
-        permissions = set()
+        # Get user with roles and permissions loaded
+        stmt = select(User).where(User.id == user_id).options(
+            selectinload(User.roles).selectinload(Role.permissions),
+            selectinload(User.direct_permissions)
+        )
+        result = await self.db.execute(stmt)
+        user = result.scalar_one_or_none()
         
-        for role in roles:
-            if role.permissions:
-                role_permissions = json.loads(role.permissions)
-                permissions.update(role_permissions)
+        if not user:
+            return []
         
-        return list(permissions)
+        return user.get_permissions()
     
     async def user_has_permission(self, user_id: int, permission: str) -> bool:
         """Check if user has specific permission"""

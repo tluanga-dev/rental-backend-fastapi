@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional, List
 
 from app.core.database import Base
+from app.modules.auth.models import user_roles_table, user_permissions_table, UserType
 
 
 class User(Base):
@@ -17,10 +18,17 @@ class User(Base):
     password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     
+    # Enhanced name fields for frontend compatibility
+    first_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    
     # Status fields
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    
+    # User type for hierarchy
+    user_type: Mapped[str] = mapped_column(String(20), default=UserType.USER.value, nullable=False)
     
     # Optional profile fields
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -35,6 +43,12 @@ class User(Base):
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
     
+    # RBAC relationships
+    roles = relationship("Role", secondary=user_roles_table, back_populates="users")
+    direct_permissions = relationship("Permission", secondary=user_permissions_table, 
+                                    primaryjoin="User.id == user_permissions.c.user_id",
+                                    secondaryjoin="Permission.id == user_permissions.c.permission_id")
+    
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, active={self.is_active})>"
     
@@ -47,6 +61,86 @@ class User(Base):
     def display_name(self) -> str:
         """Get display name for user"""
         return self.full_name or self.email
+    
+    @property
+    def name(self) -> str:
+        """Get name for frontend compatibility"""
+        return self.full_name or f"{self.first_name or ''} {self.last_name or ''}".strip() or self.email
+    
+    @property
+    def firstName(self) -> str:
+        """Get first name for frontend compatibility"""
+        return self.first_name or ""
+    
+    @property
+    def lastName(self) -> str:
+        """Get last name for frontend compatibility"""
+        return self.last_name or ""
+    
+    def get_user_type(self) -> UserType:
+        """Get user type enum"""
+        return UserType(self.user_type)
+    
+    def has_role(self, role_name: str) -> bool:
+        """Check if user has a specific role"""
+        return any(role.name == role_name for role in self.roles)
+    
+    def has_permission(self, permission_name: str) -> bool:
+        """Check if user has a specific permission"""
+        # Superusers have all permissions
+        if self.is_superuser:
+            return True
+            
+        # Check direct permissions
+        for permission in self.direct_permissions:
+            if permission.name == permission_name:
+                return True
+                
+        # Check role permissions
+        for role in self.roles:
+            if role.has_permission(permission_name):
+                return True
+        return False
+    
+    def get_permissions(self) -> List[str]:
+        """Get all permissions for the user"""
+        permissions = set()
+        
+        # Add direct permissions
+        for permission in self.direct_permissions:
+            permissions.add(permission.name)
+            
+        # Add role permissions
+        for role in self.roles:
+            permissions.update(role.get_permissions())
+            
+        return list(permissions)
+    
+    def get_role_permissions(self) -> List[str]:
+        """Get all permissions from roles"""
+        permissions = set()
+        for role in self.roles:
+            permissions.update(role.get_permissions())
+        return list(permissions)
+    
+    def get_direct_permissions(self) -> List[str]:
+        """Get all direct permissions for the user"""
+        return [perm.name for perm in self.direct_permissions]
+    
+    def get_effective_permissions(self) -> dict:
+        """Get effective permissions structure expected by frontend"""
+        all_permissions = self.get_permissions()
+        role_permissions = self.get_role_permissions()
+        direct_permissions = self.get_direct_permissions()
+        
+        return {
+            "userType": self.user_type,
+            "isSuperuser": self.is_superuser,
+            "rolePermissions": role_permissions,
+            "directPermissions": direct_permissions,
+            "allPermissions": all_permissions,
+            "all_permissions": all_permissions,  # Snake_case fallback
+        }
 
 
 class UserProfile(Base):
@@ -90,35 +184,3 @@ class UserProfile(Base):
         return f"<UserProfile(id={self.id}, user_id={self.user_id})>"
 
 
-class UserRole(Base):
-    """User role model for RBAC"""
-    __tablename__ = "user_roles"
-    
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    
-    # Permissions (JSON field or separate table in production)
-    permissions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    
-    def __repr__(self):
-        return f"<UserRole(id={self.id}, name={self.name})>"
-
-
-class UserRoleAssignment(Base):
-    """User role assignment model"""
-    __tablename__ = "user_role_assignments"
-    
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    role_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    assigned_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), 
-        server_default=func.now(), 
-        nullable=False
-    )
-    assigned_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    
-    def __repr__(self):
-        return f"<UserRoleAssignment(id={self.id}, user_id={self.user_id}, role_id={self.role_id})>"

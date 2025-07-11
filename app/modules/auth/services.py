@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, and_
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status, Request
 import secrets
 import uuid
@@ -20,7 +21,7 @@ from app.shared.exceptions import (
     AlreadyExistsError,
     ValidationError
 )
-from app.modules.auth.models import RefreshToken, LoginAttempt, PasswordResetToken
+from app.modules.auth.models import RefreshToken, LoginAttempt, PasswordResetToken, Role
 from app.modules.users.models import User
 from app.modules.users.services import UserService
 
@@ -66,25 +67,41 @@ class AuthService:
         ip_address = request.client.host if request else None
         user_agent = request.headers.get("user-agent") if request else None
         
-        # Get user by username or email
-        user = await self.user_service.get_by_username_or_email(username_or_email)
-        
-        # Log login attempt
-        await self._log_login_attempt(
-            email=username_or_email,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            success=False
-        )
+        # Get user by username or email with roles and permissions
+        user = await self._get_user_with_permissions(username_or_email)
         
         if not user:
+            # Log failed login attempt
+            await self._log_login_attempt(
+                email=username_or_email,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                success=False,
+                failure_reason="User not found"
+            )
             raise InvalidCredentialsError("Invalid username/email or password")
         
         if not user.is_active:
+            # Log failed login attempt
+            await self._log_login_attempt(
+                email=username_or_email,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                success=False,
+                failure_reason="Account disabled"
+            )
             raise InvalidCredentialsError("Account is disabled")
         
         # Verify password
         if not verify_password(password, user.password):
+            # Log failed login attempt
+            await self._log_login_attempt(
+                email=username_or_email,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                success=False,
+                failure_reason="Invalid password"
+            )
             raise InvalidCredentialsError("Invalid username/email or password")
         
         # Create tokens
@@ -102,7 +119,7 @@ class AuthService:
             user_agent=user_agent
         )
         
-        # Update successful login attempt
+        # Log successful login attempt
         await self._log_login_attempt(
             email=username_or_email,
             ip_address=ip_address,
@@ -113,19 +130,16 @@ class AuthService:
         # Update last login
         await self.user_service.update_last_login(user.id)
         
+        # Build comprehensive user response
+        user_response = self._build_user_response(user)
+        
         return {
             "access_token": tokens.access_token,
             "refresh_token": tokens.refresh_token,
             "token_type": tokens.token_type,
             "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "full_name": user.full_name,
-                "is_active": user.is_active,
-                "is_superuser": user.is_superuser
-            }
+            "expiresIn": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # camelCase for frontend
+            "user": user_response
         }
     
     async def refresh_token(self, refresh_token: str) -> Dict[str, Any]:
@@ -325,3 +339,58 @@ class AuthService:
         )
         
         await self.db.commit()
+    
+    async def _get_user_with_permissions(self, username_or_email: str) -> Optional[User]:
+        """Get user with roles and permissions loaded"""
+        # Check if it's email or username
+        if "@" in username_or_email:
+            stmt = select(User).where(User.email == username_or_email)
+        else:
+            stmt = select(User).where(User.username == username_or_email)
+        
+        # Load roles and permissions
+        stmt = stmt.options(
+            selectinload(User.roles).selectinload(Role.permissions),
+            selectinload(User.direct_permissions)
+        )
+        
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+    
+    def _build_user_response(self, user: User) -> Dict[str, Any]:
+        """Build comprehensive user response with RBAC data"""
+        # Get effective permissions
+        effective_permissions = user.get_effective_permissions()
+        
+        # Build user response matching frontend expectations
+        user_response = {
+            "id": str(user.id),  # Convert to string for consistency
+            "email": user.email,
+            "username": user.username,
+            "firstName": user.firstName,
+            "lastName": user.lastName,
+            "name": user.name,
+            "full_name": user.full_name,  # Keep both for compatibility
+            "userType": user.user_type,
+            "locationId": None,  # Set if user has location
+            "isActive": user.is_active,
+            "is_active": user.is_active,  # Keep both for compatibility
+            "isSuperuser": user.is_superuser,
+            "is_superuser": user.is_superuser,  # Keep both for compatibility
+            "lastLogin": user.last_login.isoformat() if user.last_login else None,
+            "createdAt": user.created_at.isoformat() if hasattr(user, 'created_at') and user.created_at else None,
+            "updatedAt": user.updated_at.isoformat() if hasattr(user, 'updated_at') and user.updated_at else None,
+            "directPermissions": effective_permissions["directPermissions"],
+            "effectivePermissions": effective_permissions,
+            "effective_permissions": effective_permissions,  # Snake_case fallback
+        }
+        
+        # Add role information if available
+        if user.roles:
+            user_response["role"] = {
+                "id": user.roles[0].id,
+                "name": user.roles[0].name,
+                "description": user.roles[0].description
+            }
+        
+        return user_response
