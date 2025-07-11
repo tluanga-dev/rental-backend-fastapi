@@ -825,7 +825,7 @@ Create a new supplier.
 
 ### Items
 
-#### GET /api/inventory/inventory/items
+#### GET /api/inventory/items
 Get all inventory items.
 
 **Query Parameters:**
@@ -843,38 +843,37 @@ Get all inventory items.
   {
     "id": "item-uuid",
     "item_code": "ITEM001",
-    "item_name": "MacBook Pro 13-inch",
+    "sku": "CONS-HM-EXCA-R-001",
+    "item_name": "Excavator Caterpillar 320",
     "item_type": "RENTAL",
     "item_status": "ACTIVE",
-    "brand_id": "apple-brand-uuid",
-    "category_id": "laptop-category-uuid",
-    "purchase_price": "1299.00",
-    "rental_price_per_day": "65.00",
+    "brand_id": null,
+    "category_id": "heavy-machinery-uuid",
+    "purchase_price": "150000.00",
+    "rental_price_per_day": "1200.00",
     "sale_price": null,
-    "description": "13-inch MacBook Pro with M2 chip",
+    "description": "Heavy duty excavator for construction",
     "is_active": true,
     "created_at": "2025-01-01T00:00:00Z",
     "updated_at": "2025-01-01T00:00:00Z",
-    "display_name": "MacBook Pro 13-inch (ITEM001)"
+    "display_name": "Excavator Caterpillar 320 (ITEM001)"
   }
 ]
 ```
 
-#### POST /api/inventory/inventory/items
-Create a new inventory item.
+#### POST /api/inventory/items
+Create a new inventory item with automatic SKU generation.
 
 **Request Body:**
 ```json
 {
-  "item_code": "ITEM002",
-  "item_name": "iPad Air",
-  "item_type": "BOTH",
-  "brand_id": "apple-brand-uuid",
-  "category_id": "tablet-category-uuid",
-  "purchase_price": 599.00,
-  "rental_price_per_day": 30.00,
-  "sale_price": 699.00,
-  "description": "10.9-inch iPad Air with M1 chip"
+  "item_code": "DRILL001",
+  "item_name": "Power Drill Makita",
+  "item_type": "SALE",
+  "category_id": "power-tools-uuid",
+  "purchase_price": 120.00,
+  "sale_price": 180.00,
+  "description": "Professional grade power drill"
 }
 ```
 
@@ -882,22 +881,119 @@ Create a new inventory item.
 ```json
 {
   "id": "new-item-uuid",
-  "item_code": "ITEM002",
-  "item_name": "iPad Air",
-  "item_type": "BOTH",
+  "item_code": "DRILL001",
+  "sku": "TOOL-PWR-POWE-S-001",
+  "item_name": "Power Drill Makita",
+  "item_type": "SALE",
   "item_status": "ACTIVE",
-  "brand_id": "apple-brand-uuid",
-  "category_id": "tablet-category-uuid",
-  "purchase_price": "599.00",
-  "rental_price_per_day": "30.00",
-  "sale_price": "699.00",
-  "description": "10.9-inch iPad Air with M1 chip",
+  "brand_id": null,
+  "category_id": "power-tools-uuid",
+  "purchase_price": "120.00",
+  "rental_price_per_day": null,
+  "sale_price": "180.00",
+  "description": "Professional grade power drill",
   "is_active": true,
   "created_at": "2025-01-10T10:00:00Z",
   "updated_at": "2025-01-10T10:00:00Z",
-  "display_name": "iPad Air (ITEM002)"
+  "display_name": "Power Drill Makita (DRILL001)"
 }
 ```
+
+#### GET /api/inventory/items/{item_id}
+Get item by ID.
+
+#### GET /api/inventory/items/code/{item_code}
+Get item by item code.
+
+#### GET /api/inventory/items/sku/{sku}
+Get item by SKU.
+
+**Response (200):** Same as item object above
+
+#### PUT /api/inventory/items/{item_id}
+Update an existing item.
+
+#### DELETE /api/inventory/items/{item_id}
+Soft delete an item.
+
+#### GET /api/inventory/items/search/{search_term}
+Search items by name or code.
+
+#### GET /api/inventory/items/rental
+Get all rental items (RENTAL or BOTH types).
+
+#### GET /api/inventory/items/sale
+Get all sale items (SALE or BOTH types).
+
+### SKU Management
+
+#### POST /api/inventory/skus/generate
+Preview SKU generation for given parameters.
+
+**Request Body:**
+```json
+{
+  "category_id": "e5c46b97-6730-4c07-819c-2ed9014e7feb",
+  "item_name": "Excavator Caterpillar",
+  "item_type": "RENTAL"
+}
+```
+
+**Response (200):**
+```json
+{
+  "sku": "CONS-HM-EXCA-R-001",
+  "category_code": "CONS",
+  "subcategory_code": "HM",
+  "product_code": "EXCA",
+  "attributes_code": "R",
+  "sequence_number": 1
+}
+```
+
+#### POST /api/inventory/skus/bulk-generate
+Generate SKUs for all existing items that don't have them.
+
+**Response (200):**
+```json
+{
+  "total_processed": 10,
+  "successful_generations": 9,
+  "failed_generations": 1,
+  "errors": [
+    {
+      "item_id": "item-uuid",
+      "item_code": "ITEM123",
+      "error": "Category not found"
+    }
+  ]
+}
+```
+
+### SKU Format Specification
+
+**Format:** `[CATEGORY]-[SUBCATEGORY]-[PRODUCT]-[ATTRIBUTES]-[SEQUENCE]`
+
+- **CATEGORY**: 1-4 character abbreviation of root category (e.g., CONS for Construction)
+- **SUBCATEGORY**: 1-4 character abbreviation of subcategory (e.g., HM for Heavy Machinery)
+- **PRODUCT**: First 4 letters of product name, uppercase, alphanumeric only (e.g., EXCA for Excavator)
+- **ATTRIBUTES**: Single character indicating item type:
+  - `R` = Rental only
+  - `S` = Sale only
+  - `B` = Both rental and sale
+- **SEQUENCE**: 3-digit zero-padded sequence number (e.g., 001, 002, 003)
+
+**Examples:**
+- `CONS-HM-EXCA-R-001` - Construction > Heavy Machinery > Excavator (Rental)
+- `CONS-MAC-GENE-B-001` - Construction > Machinery > Generator (Both)
+- `TOOL-PWR-DRIL-S-001` - Tools > Power Tools > Drill (Sale only)
+- `MISC-ITEM-PROD-R-001` - Fallback format when category hierarchy is not available
+
+**Notes:**
+- SKUs are automatically generated during item creation
+- Custom SKU input is not supported
+- SKUs must be unique across the system
+- The system tracks sequences per unique combination of category, subcategory, product, and attributes
 
 ### Inventory Units
 

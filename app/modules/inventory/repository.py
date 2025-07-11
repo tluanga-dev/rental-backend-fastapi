@@ -22,10 +22,11 @@ class ItemRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
     
-    async def create(self, item_data: ItemCreate) -> Item:
-        """Create a new item."""
+    async def create(self, item_data: ItemCreate, sku: str) -> Item:
+        """Create a new item with SKU."""
         item = Item(
             item_code=item_data.item_code,
+            sku=sku,
             item_name=item_data.item_name,
             item_type=item_data.item_type,
             purchase_price=item_data.purchase_price,
@@ -86,6 +87,23 @@ class ItemRepository:
         query = select(Item).where(Item.item_code == item_code)
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+    
+    async def get_by_sku(self, sku: str) -> Optional[Item]:
+        """Get item by SKU."""
+        query = select(Item).where(Item.sku == sku)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+    
+    async def exists_by_sku(self, sku: str, exclude_id: Optional[UUID] = None) -> bool:
+        """Check if an item with the given SKU exists."""
+        query = select(func.count()).select_from(Item).where(Item.sku == sku)
+        
+        if exclude_id:
+            query = query.where(Item.id != exclude_id)
+        
+        result = await self.session.execute(query)
+        count = result.scalar_one()
+        return count > 0
     
     async def get_all(
         self, 

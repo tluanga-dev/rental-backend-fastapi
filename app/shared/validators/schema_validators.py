@@ -11,8 +11,8 @@ from decimal import Decimal
 import re
 from uuid import UUID
 
-from pydantic import validator, Field, BaseModel
-from pydantic.validators import str_validator
+from pydantic import Field, BaseModel, field_validator
+from pydantic_core import core_schema
 
 from .business_rules import (
     BusinessRuleValidator,
@@ -108,23 +108,29 @@ class SKUStr(str):
     """Custom SKU string type with validation."""
     
     @classmethod
-    def __get_validators__(cls):
-        yield str_validator
-        yield cls.validate
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls.validate,
+            core_schema.str_schema(),
+        )
     
     @classmethod
     def validate(cls, v: str) -> str:
-        result = InventoryValidator.validate_sku(v)
-        result.raise_if_errors()
-        return v.upper()  # Normalize to uppercase
-    
-    @classmethod
-    def __modify_schema__(cls, field_schema: Dict[str, Any]) -> None:
-        field_schema.update(
-            pattern='^[A-Za-z0-9\\-_]{3,50}$',
-            example='LAPTOP-001',
-            description='Product SKU (3-50 alphanumeric characters, hyphens, underscores)'
-        )
+        # Basic validation that doesn't depend on business rules
+        if not isinstance(v, str):
+            raise ValueError('SKU must be a string')
+        
+        v = v.strip().upper()
+        
+        if len(v) < 3 or len(v) > 50:
+            raise ValueError('SKU must be between 3 and 50 characters')
+        
+        if not re.match(r'^[A-Za-z0-9\-_]+$', v):
+            raise ValueError('SKU can only contain letters, numbers, hyphens, and underscores')
+        
+        return v
 
 
 # Common Field Definitions with Enhanced Validation

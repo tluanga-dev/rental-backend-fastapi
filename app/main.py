@@ -19,7 +19,7 @@ from app.modules.master_data.locations.models import Location
 from app.modules.master_data.units.models import UnitOfMeasurement
 from app.modules.suppliers.models import Supplier
 from app.modules.customers.models import Customer
-from app.modules.inventory.models import Item, InventoryUnit, StockLevel
+from app.modules.inventory.models import Item, InventoryUnit, StockLevel, SKUSequence
 from app.modules.transactions.models import TransactionHeader, TransactionLine
 from app.modules.rentals.models import RentalReturn, RentalReturnLine, InspectionReport
 from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert

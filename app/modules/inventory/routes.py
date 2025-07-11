@@ -12,7 +12,8 @@ from app.modules.inventory.schemas import (
     InventoryUnitStatusUpdate,
     StockLevelCreate, StockLevelUpdate, StockLevelResponse, StockLevelListResponse,
     StockAdjustment, StockReservation, StockReservationRelease,
-    InventoryReport, ItemWithInventoryResponse
+    InventoryReport, ItemWithInventoryResponse,
+    SKUGenerationRequest, SKUGenerationResponse, SKUBulkGenerationResponse
 )
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 
@@ -412,3 +413,39 @@ async def get_inventory_report(
 ):
     """Get comprehensive inventory report."""
     return await service.get_inventory_report()
+
+
+# SKU-specific endpoints
+@router.get("/items/sku/{sku}", response_model=ItemResponse)
+async def get_item_by_sku(
+    sku: str,
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get item by SKU."""
+    try:
+        return await service.get_item_by_sku(sku)
+    except NotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+@router.post("/skus/generate", response_model=SKUGenerationResponse)
+async def generate_sku_preview(
+    request: SKUGenerationRequest,
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Generate a preview of what SKU would be created for the given brand/category."""
+    return await service.generate_sku_preview(request)
+
+
+# SKU validation endpoint removed - custom SKUs are no longer supported
+
+
+@router.post("/skus/bulk-generate", response_model=SKUBulkGenerationResponse)
+async def bulk_generate_skus(
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Generate SKUs for all existing items that don't have them."""
+    return await service.bulk_generate_skus()

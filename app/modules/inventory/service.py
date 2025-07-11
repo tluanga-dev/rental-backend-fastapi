@@ -17,8 +17,10 @@ from app.modules.inventory.schemas import (
     InventoryUnitCreate, InventoryUnitUpdate, InventoryUnitResponse,
     StockLevelCreate, StockLevelUpdate, StockLevelResponse,
     StockAdjustment, StockReservation, StockReservationRelease,
-    InventoryReport, ItemWithInventoryResponse
+    InventoryReport, ItemWithInventoryResponse,
+    SKUGenerationRequest, SKUGenerationResponse, SKUBulkGenerationResponse
 )
+from app.shared.utils.sku_generator import SKUGenerator
 
 
 class InventoryService:
@@ -29,20 +31,28 @@ class InventoryService:
         self.item_repository = ItemRepository(session)
         self.inventory_unit_repository = InventoryUnitRepository(session)
         self.stock_level_repository = StockLevelRepository(session)
+        self.sku_generator = SKUGenerator(session)
     
     # Item operations
     async def create_item(self, item_data: ItemCreate) -> ItemResponse:
-        """Create a new item."""
+        """Create a new item with automatic SKU generation."""
         # Check if item code already exists
         existing_item = await self.item_repository.get_by_code(item_data.item_code)
         if existing_item:
             raise ConflictError(f"Item with code '{item_data.item_code}' already exists")
         
+        # Generate SKU automatically using new format
+        sku = await self.sku_generator.generate_sku(
+            category_id=item_data.category_id,
+            item_name=item_data.item_name,
+            item_type=item_data.item_type.value
+        )
+        
         # Validate item type and pricing
         self._validate_item_pricing(item_data)
         
-        # Create item
-        item = await self.item_repository.create(item_data)
+        # Create item with generated SKU
+        item = await self.item_repository.create(item_data, sku)
         return ItemResponse.model_validate(item)
     
     async def get_item(self, item_id: UUID) -> ItemResponse:
@@ -487,6 +497,47 @@ class InventoryService:
         
         if new_status.value not in valid_transitions.get(current_status, []):
             raise ValidationError(f"Invalid status transition from {current_status} to {new_status.value}")
+    
+    # SKU-specific operations
+    async def get_item_by_sku(self, sku: str) -> ItemResponse:
+        """Get item by SKU."""
+        item = await self.item_repository.get_by_sku(sku)
+        if not item:
+            raise NotFoundError(f"Item with SKU '{sku}' not found")
+        return ItemResponse.model_validate(item)
+    
+    async def generate_sku_preview(self, request: SKUGenerationRequest) -> SKUGenerationResponse:
+        """Generate a preview of what SKU would be created."""
+        sku = await self.sku_generator.preview_sku(
+            category_id=request.category_id,
+            item_name=request.item_name,
+            item_type=request.item_type
+        )
+        
+        # Extract components for response
+        parts = sku.split('-')
+        if len(parts) == 5:
+            category_code, subcategory_code, product_code, attributes_code, sequence = parts
+            sequence_number = int(sequence)
+        else:
+            category_code = "MISC"
+            subcategory_code = "ITEM"
+            sequence_number = 1
+        
+        return SKUGenerationResponse(
+            sku=sku,
+            category_code=category_code,
+            subcategory_code=subcategory_code,
+            product_code=parts[2] if len(parts) > 2 else "PROD",
+            attributes_code=parts[3] if len(parts) > 3 else "R",
+            sequence_number=sequence_number
+        )
+    
+    
+    async def bulk_generate_skus(self) -> SKUBulkGenerationResponse:
+        """Generate SKUs for all existing items that don't have them."""
+        result = await self.sku_generator.bulk_generate_skus_for_existing_items()
+        return SKUBulkGenerationResponse(**result)
     
     async def _update_stock_levels_for_unit_creation(self, unit: InventoryUnit):
         """Update stock levels when a new inventory unit is created."""

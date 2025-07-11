@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator, computed_fie
 from uuid import UUID
 
 from app.modules.inventory.models import ItemType, ItemStatus, InventoryUnitStatus, InventoryUnitCondition
+# Simplified approach - using string with pattern validation
 
 
 class ItemCreate(BaseModel):
@@ -103,6 +104,7 @@ class ItemResponse(BaseModel):
     
     id: UUID
     item_code: str
+    sku: str
     item_name: str
     item_type: ItemType
     item_status: ItemStatus
@@ -466,3 +468,32 @@ class InventoryUnitWithItemResponse(BaseModel):
     def full_display_name(self) -> str:
         """This will be populated by the service layer with item info."""
         return f"{self.unit_code}"
+
+
+# SKU-specific schemas
+class SKUGenerationRequest(BaseModel):
+    """Schema for SKU generation request."""
+    
+    category_id: Optional[UUID] = Field(None, description="Category ID for SKU generation")
+    item_name: str = Field(..., description="Item name for product code generation")
+    item_type: str = Field(default="RENTAL", description="Item type (RENTAL, SALE, BOTH)")
+
+
+class SKUGenerationResponse(BaseModel):
+    """Schema for SKU generation response."""
+    
+    sku: str = Field(..., description="Generated SKU")
+    category_code: str = Field(..., description="Category code used")
+    subcategory_code: str = Field(..., description="Subcategory code used")
+    product_code: str = Field(..., description="Product code (first 4 letters of item name)")
+    attributes_code: str = Field(..., description="Attributes code (R/S/B)")
+    sequence_number: int = Field(..., description="Sequence number used")
+
+
+class SKUBulkGenerationResponse(BaseModel):
+    """Schema for bulk SKU generation response."""
+    
+    total_processed: int = Field(..., description="Total items processed")
+    successful_generations: int = Field(..., description="Number of successful generations")
+    failed_generations: int = Field(..., description="Number of failed generations")
+    errors: List[dict] = Field(default_factory=list, description="Generation errors")

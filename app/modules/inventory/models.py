@@ -56,6 +56,7 @@ class Item(BaseModel):
     
     Attributes:
         item_code: Unique item code
+        sku: Stock Keeping Unit
         item_name: Item name
         item_type: Type of item (RENTAL, SALE, BOTH)
         item_status: Status of item (ACTIVE, INACTIVE, DISCONTINUED)
@@ -89,6 +90,7 @@ class Item(BaseModel):
     __tablename__ = "items"
     
     item_code = Column(String(50), nullable=False, unique=True, index=True, comment="Unique item code")
+    sku = Column(String(50), nullable=False, unique=True, index=True, comment="Stock Keeping Unit")
     item_name = Column(String(200), nullable=False, comment="Item name")
     item_type = Column(String(20), nullable=False, comment="Item type")
     item_status = Column(String(20), nullable=False, default=ItemStatus.ACTIVE.value, comment="Item status")
@@ -124,6 +126,7 @@ class Item(BaseModel):
     # Indexes for efficient queries
     __table_args__ = (
         Index('idx_item_code', 'item_code'),
+        Index('idx_item_sku', 'sku'),
         Index('idx_item_name', 'item_name'),
         Index('idx_item_type', 'item_type'),
         Index('idx_item_status', 'item_status'),
@@ -135,6 +138,7 @@ class Item(BaseModel):
     def __init__(
         self,
         item_code: str,
+        sku: str,
         item_name: str,
         item_type: ItemType,
         purchase_price: Decimal = Decimal("0.00"),
@@ -146,6 +150,7 @@ class Item(BaseModel):
         
         Args:
             item_code: Unique item code
+            sku: Stock Keeping Unit
             item_name: Item name
             item_type: Type of item
             purchase_price: Purchase price
@@ -154,6 +159,7 @@ class Item(BaseModel):
         """
         super().__init__(**kwargs)
         self.item_code = item_code
+        self.sku = sku
         self.item_name = item_name
         self.item_type = item_type.value if isinstance(item_type, ItemType) else item_type
         self.purchase_price = purchase_price
@@ -675,4 +681,98 @@ class StockLevel(BaseModel):
             f"StockLevel(id={self.id}, item_id={self.item_id}, "
             f"location_id={self.location_id}, on_hand={self.quantity_on_hand}, "
             f"available={self.quantity_available}, active={self.is_active})"
+        )
+
+
+class SKUSequence(BaseModel):
+    """
+    SKU sequence tracking model for generating unique SKUs.
+    
+    This model tracks the next sequence number for each brand-category combination
+    to ensure unique SKU generation.
+    
+    Attributes:
+        brand_code: Brand code for SKU generation
+        category_code: Category code for SKU generation
+        next_sequence: Next sequence number to use
+    """
+    
+    __tablename__ = "sku_sequences"
+    
+    brand_code = Column(String(20), nullable=True, comment="Brand code")
+    category_code = Column(String(20), nullable=True, comment="Category code")
+    next_sequence = Column(String(10), nullable=False, default="1", comment="Next sequence number")
+    
+    # Indexes for efficient queries
+    __table_args__ = (
+        Index('idx_sku_sequence_brand_category', 'brand_code', 'category_code', unique=True),
+        Index('idx_sku_sequence_brand', 'brand_code'),
+        Index('idx_sku_sequence_category', 'category_code'),
+    )
+    
+    def __init__(
+        self,
+        brand_code: Optional[str] = None,
+        category_code: Optional[str] = None,
+        next_sequence: str = "1",
+        **kwargs
+    ):
+        """
+        Initialize a SKU Sequence.
+        
+        Args:
+            brand_code: Brand code for SKU generation
+            category_code: Category code for SKU generation  
+            next_sequence: Next sequence number
+            **kwargs: Additional BaseModel fields
+        """
+        super().__init__(**kwargs)
+        self.brand_code = brand_code
+        self.category_code = category_code
+        self.next_sequence = next_sequence
+        self._validate()
+    
+    def _validate(self):
+        """Validate SKU sequence business rules."""
+        # Brand code validation
+        if self.brand_code:
+            if len(self.brand_code) > 20:
+                raise ValueError("Brand code cannot exceed 20 characters")
+            self.brand_code = self.brand_code.upper().strip()
+        
+        # Category code validation
+        if self.category_code:
+            if len(self.category_code) > 20:
+                raise ValueError("Category code cannot exceed 20 characters")
+            self.category_code = self.category_code.upper().strip()
+        
+        # Sequence validation
+        try:
+            int(self.next_sequence)
+        except ValueError:
+            raise ValueError("Next sequence must be a valid number")
+    
+    def get_next_sequence_number(self) -> int:
+        """Get next sequence number as integer."""
+        return int(self.next_sequence)
+    
+    def increment_sequence(self):
+        """Increment the sequence number."""
+        current = int(self.next_sequence)
+        self.next_sequence = str(current + 1)
+    
+    @property
+    def sequence_key(self) -> str:
+        """Get unique key for this sequence."""
+        return f"{self.brand_code or 'NONE'}-{self.category_code or 'NONE'}"
+    
+    def __str__(self) -> str:
+        """String representation of SKU sequence."""
+        return f"SKU Sequence: {self.sequence_key} -> {self.next_sequence}"
+    
+    def __repr__(self) -> str:
+        """Developer representation of SKU sequence."""
+        return (
+            f"SKUSequence(id={self.id}, brand_code='{self.brand_code}', "
+            f"category_code='{self.category_code}', next_sequence='{self.next_sequence}')"
         )
