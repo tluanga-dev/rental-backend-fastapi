@@ -76,7 +76,29 @@ class LocationService:
         if not location:
             return None
         
-        return LocationResponse.model_validate(location)
+        # Map model fields to response schema format
+        response_data = {
+            'id': location.id,
+            'location_code': location.location_code,
+            'location_name': location.location_name,
+            'location_type': location.location_type,
+            'address_line1': location.address,
+            'address_line2': None,
+            'city': location.city,
+            'state': location.state,
+            'postal_code': location.postal_code,
+            'country': location.country,
+            'phone': location.contact_number,
+            'email': location.email,
+            'manager_user_id': location.manager_user_id,
+            'operating_hours': None,
+            'capacity': None,
+            'description': None,
+            'created_at': location.created_at,
+            'updated_at': location.updated_at,
+            'is_active': location.is_active if hasattr(location, 'is_active') else True,
+        }
+        return LocationResponse(**response_data)
     
     async def get_location_by_code(self, location_code: str) -> Optional[LocationResponse]:
         """Get location by code."""
@@ -84,7 +106,29 @@ class LocationService:
         if not location:
             return None
         
-        return LocationResponse.model_validate(location)
+        # Map model fields to response schema format
+        response_data = {
+            'id': location.id,
+            'location_code': location.location_code,
+            'location_name': location.location_name,
+            'location_type': location.location_type,
+            'address_line1': location.address,
+            'address_line2': None,
+            'city': location.city,
+            'state': location.state,
+            'postal_code': location.postal_code,
+            'country': location.country,
+            'phone': location.contact_number,
+            'email': location.email,
+            'manager_user_id': location.manager_user_id,
+            'operating_hours': None,
+            'capacity': None,
+            'description': None,
+            'created_at': location.created_at,
+            'updated_at': location.updated_at,
+            'is_active': location.is_active if hasattr(location, 'is_active') else True,
+        }
+        return LocationResponse(**response_data)
     
     async def update_location(self, location_id: UUID, update_data: LocationUpdate) -> LocationResponse:
         """Update location information."""
@@ -96,7 +140,29 @@ class LocationService:
         update_dict = update_data.model_dump(exclude_unset=True)
         updated_location = await self.repository.update(location_id, update_dict)
         
-        return LocationResponse.model_validate(updated_location)
+        # Map model fields to response schema format
+        response_data = {
+            'id': updated_location.id,
+            'location_code': updated_location.location_code,
+            'location_name': updated_location.location_name,
+            'location_type': updated_location.location_type,
+            'address_line1': updated_location.address,
+            'address_line2': None,
+            'city': updated_location.city,
+            'state': updated_location.state,
+            'postal_code': updated_location.postal_code,
+            'country': updated_location.country,
+            'phone': updated_location.contact_number,
+            'email': updated_location.email,
+            'manager_user_id': updated_location.manager_user_id,
+            'operating_hours': None,
+            'capacity': None,
+            'description': None,
+            'created_at': updated_location.created_at,
+            'updated_at': updated_location.updated_at,
+            'is_active': updated_location.is_active if hasattr(updated_location, 'is_active') else True,
+        }
+        return LocationResponse(**response_data)
     
     async def delete_location(self, location_id: UUID) -> bool:
         """Delete location."""
@@ -117,7 +183,33 @@ class LocationService:
             active_only=active_only
         )
         
-        return [LocationResponse.model_validate(location) for location in locations]
+        # Map model fields to response schema format
+        result = []
+        for location in locations:
+            response_data = {
+                'id': location.id,
+                'location_code': location.location_code,
+                'location_name': location.location_name,
+                'location_type': location.location_type,
+                'address_line1': location.address,
+                'address_line2': None,
+                'city': location.city,
+                'state': location.state,
+                'postal_code': location.postal_code,
+                'country': location.country,
+                'phone': location.contact_number,
+                'email': location.email,
+                'manager_user_id': location.manager_user_id,
+                'operating_hours': None,
+                'capacity': None,
+                'description': None,
+                'created_at': location.created_at,
+                'updated_at': location.updated_at,
+                'is_active': location.is_active if hasattr(location, 'is_active') else True,
+            }
+            result.append(LocationResponse(**response_data))
+        
+        return result
     
     async def search_locations(
         self,
@@ -134,7 +226,33 @@ class LocationService:
             active_only=active_only
         )
         
-        return [LocationResponse.model_validate(location) for location in locations]
+        # Map model fields to response schema format
+        result = []
+        for location in locations:
+            response_data = {
+                'id': location.id,
+                'location_code': location.location_code,
+                'location_name': location.location_name,
+                'location_type': location.location_type,
+                'address_line1': location.address,
+                'address_line2': None,
+                'city': location.city,
+                'state': location.state,
+                'postal_code': location.postal_code,
+                'country': location.country,
+                'phone': location.contact_number,
+                'email': location.email,
+                'manager_user_id': location.manager_user_id,
+                'operating_hours': None,
+                'capacity': None,
+                'description': None,
+                'created_at': location.created_at,
+                'updated_at': location.updated_at,
+                'is_active': location.is_active if hasattr(location, 'is_active') else True,
+            }
+            result.append(LocationResponse(**response_data))
+        
+        return result
     
     async def count_locations(
         self,

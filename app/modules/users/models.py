@@ -5,7 +5,10 @@ from datetime import datetime
 from typing import Optional, List
 
 from app.core.database import Base
-from app.modules.auth.models import user_roles_table, user_permissions_table, UserType
+from app.modules.auth.models import user_roles_table, user_permissions_table, UserType, Role, Permission
+
+# Create UserRole alias for backward compatibility
+UserRole = Role
 
 
 class User(Base):

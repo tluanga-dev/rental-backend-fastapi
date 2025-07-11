@@ -16,6 +16,10 @@ This document provides a comprehensive reference for all API endpoints in the Fa
 1. [Authentication](#authentication)
 2. [User Management](#user-management)
 3. [Master Data](#master-data)
+   - [Brands](#brands)
+   - [Categories](#categories)
+   - [Locations](#locations)
+   - [Units of Measurement](#units-of-measurement)
 4. [Customer Management](#customer-management)
 5. [Supplier Management](#supplier-management)
 6. [Inventory Management](#inventory-management)
@@ -395,7 +399,7 @@ Create a new category.
 
 ### Locations
 
-#### GET /api/master-data/locations/locations/
+#### GET /api/master-data/locations/
 Get all locations.
 
 **Response (200):**
@@ -420,6 +424,232 @@ Get all locations.
   "total_pages": 1,
   "has_next": false,
   "has_previous": false
+}
+```
+
+### Units of Measurement
+
+#### GET /api/master-data/units-of-measurement/
+Get all units of measurement with pagination and filtering.
+
+**Query Parameters:**
+- `page` (optional): Page number (default: 1)
+- `page_size` (optional): Items per page (default: 20, max: 100)
+- `name` (optional): Filter by unit name (partial match)
+- `abbreviation` (optional): Filter by unit abbreviation (partial match)
+- `is_active` (optional): Filter by active status
+- `search` (optional): Search in name and abbreviation
+- `sort_field` (optional): Field to sort by (default: "name")
+- `sort_direction` (optional): Sort direction "asc" or "desc" (default: "asc")
+- `include_inactive` (optional): Include inactive units (default: false)
+
+**Response (200):**
+```json
+{
+  "items": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "Kilogram",
+      "abbreviation": "kg",
+      "is_active": true,
+      "display_name": "Kilogram (kg)"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "page_size": 20,
+  "total_pages": 1,
+  "has_next": false,
+  "has_previous": false
+}
+```
+
+#### POST /api/master-data/units-of-measurement/
+Create a new unit of measurement.
+
+**Request Body:**
+```json
+{
+  "name": "Kilogram",
+  "abbreviation": "kg",
+  "description": "Standard unit of mass"
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "Kilogram",
+  "abbreviation": "kg",
+  "description": "Standard unit of mass",
+  "is_active": true,
+  "created_at": "2025-01-10T10:00:00Z",
+  "updated_at": "2025-01-10T10:00:00Z",
+  "created_by": "user-uuid",
+  "updated_by": "user-uuid",
+  "display_name": "Kilogram (kg)",
+  "item_count": 0
+}
+```
+
+#### GET /api/master-data/units-of-measurement/{unit_id}
+Get a specific unit of measurement by ID.
+
+**Response (200):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "Kilogram",
+  "abbreviation": "kg",
+  "description": "Standard unit of mass",
+  "is_active": true,
+  "created_at": "2025-01-10T10:00:00Z",
+  "updated_at": "2025-01-10T10:00:00Z",
+  "created_by": "user-uuid",
+  "updated_by": "user-uuid",
+  "display_name": "Kilogram (kg)",
+  "item_count": 0
+}
+```
+
+#### GET /api/master-data/units-of-measurement/by-name/{unit_name}
+Get a unit of measurement by name.
+
+**Response (200):** Same as GET by ID
+
+#### GET /api/master-data/units-of-measurement/by-abbreviation/{unit_abbreviation}
+Get a unit of measurement by abbreviation.
+
+**Response (200):** Same as GET by ID
+
+#### PUT /api/master-data/units-of-measurement/{unit_id}
+Update an existing unit of measurement.
+
+**Request Body:**
+```json
+{
+  "name": "Kilogram",
+  "abbreviation": "KG",
+  "description": "Updated description",
+  "is_active": true
+}
+```
+
+**Response (200):** Same as GET by ID
+
+#### DELETE /api/master-data/units-of-measurement/{unit_id}
+Soft delete a unit of measurement (sets is_active to false).
+
+**Response (204):** No content
+
+#### GET /api/master-data/units-of-measurement/search/
+Search units of measurement by name, abbreviation, or description.
+
+**Query Parameters:**
+- `q` (required): Search query (min length: 1)
+- `limit` (optional): Maximum results (default: 10, max: 50)
+- `include_inactive` (optional): Include inactive units (default: false)
+
+**Response (200):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "Kilogram",
+    "abbreviation": "kg",
+    "is_active": true,
+    "display_name": "Kilogram (kg)"
+  }
+]
+```
+
+#### GET /api/master-data/units-of-measurement/active/
+Get all active units of measurement.
+
+**Response (200):** Array of unit summaries
+
+#### GET /api/master-data/units-of-measurement/stats/
+Get unit of measurement statistics.
+
+**Response (200):**
+```json
+{
+  "total_units": 10,
+  "active_units": 8,
+  "inactive_units": 2,
+  "units_with_items": 5,
+  "units_without_items": 5,
+  "most_used_units": [
+    {
+      "name": "Pieces",
+      "item_count": 150
+    }
+  ]
+}
+```
+
+#### POST /api/master-data/units-of-measurement/{unit_id}/activate
+Activate a unit of measurement.
+
+**Response (200):** Updated unit object
+
+#### POST /api/master-data/units-of-measurement/{unit_id}/deactivate
+Deactivate a unit of measurement.
+
+**Response (200):** Updated unit object
+
+#### POST /api/master-data/units-of-measurement/bulk-operation
+Perform bulk operations on multiple units.
+
+**Request Body:**
+```json
+{
+  "unit_ids": ["uuid1", "uuid2", "uuid3"],
+  "operation": "activate"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success_count": 3,
+  "failure_count": 0,
+  "errors": []
+}
+```
+
+#### GET /api/master-data/units-of-measurement/export/
+Export all units of measurement data.
+
+**Query Parameters:**
+- `include_inactive` (optional): Include inactive units (default: false)
+
+**Response (200):** Array of complete unit objects with all fields
+
+#### POST /api/master-data/units-of-measurement/import/
+Import units of measurement data.
+
+**Request Body:**
+```json
+[
+  {
+    "name": "Meter",
+    "abbreviation": "m",
+    "description": "Standard unit of length",
+    "is_active": true
+  }
+]
+```
+
+**Response (200):**
+```json
+{
+  "total_processed": 1,
+  "successful_imports": 1,
+  "failed_imports": 0,
+  "skipped_imports": 0,
+  "errors": []
 }
 ```
 

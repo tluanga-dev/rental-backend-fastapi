@@ -12,7 +12,7 @@ from app.shared.exceptions import CustomHTTPException
 
 # Import all models to ensure they are registered with Base.metadata
 from app.modules.users.models import User, UserProfile
-from app.modules.auth.models import RefreshToken, LoginAttempt, PasswordResetToken
+from app.modules.auth.models import RefreshToken, LoginAttempt, PasswordResetToken, Role, Permission
 from app.modules.master_data.brands.models import Brand
 from app.modules.master_data.categories.models import Category
 from app.modules.master_data.locations.models import Location

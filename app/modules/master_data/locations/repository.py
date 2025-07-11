@@ -86,7 +86,7 @@ class LocationRepository(BaseRepository[Location]):
         search_conditions = [
             Location.location_name.ilike(f"%{search_term}%"),
             Location.location_code.ilike(f"%{search_term}%"),
-            Location.address_line1.ilike(f"%{search_term}%"),
+            Location.address.ilike(f"%{search_term}%"),
             Location.city.ilike(f"%{search_term}%"),
             Location.state.ilike(f"%{search_term}%"),
             Location.country.ilike(f"%{search_term}%")

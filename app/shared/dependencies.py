@@ -73,6 +73,12 @@ async def get_unit_repository(session: AsyncSessionDep):
     return UnitRepository(session)
 
 
+async def get_unit_of_measurement_repository(session: AsyncSessionDep):
+    """Get unit of measurement repository instance."""
+    from app.modules.master_data.units.repository import UnitOfMeasurementRepository
+    return UnitOfMeasurementRepository(session)
+
+
 # Service dependencies
 
 
@@ -140,6 +146,14 @@ async def get_unit_service(
     """Get unit service instance."""
     from app.modules.master_data.units.service import UnitService
     return UnitService(unit_repo)
+
+
+async def get_unit_of_measurement_service(
+    unit_repo = Depends(get_unit_of_measurement_repository)
+):
+    """Get unit of measurement service instance."""
+    from app.modules.master_data.units.service import UnitOfMeasurementService
+    return UnitOfMeasurementService(unit_repo)
 
 
 async def get_rental_service(
@@ -256,4 +270,5 @@ __all__ = [
     "get_category_service",
     "get_location_service",
     "get_unit_service",
+    "get_unit_of_measurement_service",
 ]
