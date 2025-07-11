@@ -21,7 +21,8 @@ test_engine = create_async_engine(
     echo=False,
     pool_size=1,
     max_overflow=0,
-    pool_pre_ping=True,
+    pool_pre_ping=False,
+    poolclass=None,
     connect_args={}
 )
 
@@ -41,6 +42,7 @@ async def setup_test_db():
     yield
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    await test_engine.dispose()
 
 
 @pytest_asyncio.fixture
@@ -49,8 +51,10 @@ async def db_session(setup_test_db) -> AsyncGenerator[AsyncSession, None]:
     async with TestingSessionLocal() as session:
         try:
             yield session
-        finally:
+        except Exception:
             await session.rollback()
+            raise
+        finally:
             await session.close()
 
 
