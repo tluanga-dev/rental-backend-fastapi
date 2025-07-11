@@ -20,7 +20,7 @@ from sqlalchemy import text
 from app.core.database import AsyncSessionLocal, engine
 from app.core.security import get_password_hash
 # Import all models to ensure relationships are properly initialized
-from app.modules.users.models import User, UserProfile, UserRole, UserRoleAssignment
+from app.modules.users.models import User, UserProfile
 from app.modules.auth.models import RefreshToken, LoginAttempt, PasswordResetToken
 from app.modules.users.services import UserService
 

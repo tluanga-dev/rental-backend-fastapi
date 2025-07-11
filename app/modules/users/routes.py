@@ -225,15 +225,16 @@ async def get_roles(
     
     roles, total = await role_service.get_all_roles(pagination)
     
-    # Convert permissions from JSON string to list
+    # Convert Role objects to UserRoleResponse
     role_responses = []
     for role in roles:
+        permissions = [perm.name for perm in role.permissions] if hasattr(role, 'permissions') and role.permissions else []
         role_dict = {
             "id": role.id,
             "name": role.name,
             "description": role.description,
             "is_active": role.is_active,
-            "permissions": role.permissions.split(",") if role.permissions else [],
+            "permissions": permissions,
             "created_at": role.created_at,
             "updated_at": role.updated_at
         }
@@ -260,12 +261,13 @@ async def create_role(
     role_data = role_create.dict()
     role = await role_service.create_role(role_data)
     
+    permissions = [perm.name for perm in role.permissions] if hasattr(role, 'permissions') and role.permissions else []
     return UserRoleResponse(
         id=role.id,
         name=role.name,
         description=role.description,
         is_active=role.is_active,
-        permissions=role.permissions.split(",") if role.permissions else [],
+        permissions=permissions,
         created_at=role.created_at,
         updated_at=role.updated_at
     )
@@ -310,15 +312,16 @@ async def get_user_roles(
     
     roles = await role_service.get_user_roles(user_id)
     
-    # Convert permissions from JSON string to list
+    # Convert Role objects to UserRoleResponse
     role_responses = []
     for role in roles:
+        permissions = [perm.name for perm in role.permissions] if hasattr(role, 'permissions') and role.permissions else []
         role_dict = {
             "id": role.id,
             "name": role.name,
             "description": role.description,
             "is_active": role.is_active,
-            "permissions": role.permissions.split(",") if role.permissions else [],
+            "permissions": permissions,
             "created_at": role.created_at,
             "updated_at": role.updated_at
         }

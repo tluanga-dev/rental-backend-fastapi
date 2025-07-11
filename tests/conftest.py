@@ -3,7 +3,6 @@ import pytest_asyncio
 from typing import AsyncGenerator
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.main import app
 from app.core.database import get_db, Base
@@ -20,8 +19,10 @@ TEST_DATABASE_URL = "postgresql+asyncpg://fastapi_user:fastapi_password@localhos
 test_engine = create_async_engine(
     TEST_DATABASE_URL,
     echo=False,
-    poolclass=StaticPool,
-    connect_args={"check_same_thread": False} if "sqlite" in TEST_DATABASE_URL else {}
+    pool_size=1,
+    max_overflow=0,
+    pool_pre_ping=True,
+    connect_args={}
 )
 
 # Create test session factory

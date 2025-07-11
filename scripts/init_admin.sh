@@ -42,7 +42,7 @@ import sys
 sys.path.insert(0, '/app')
 from app.core.database import init_db
 # Import all models to ensure they are registered with SQLAlchemy
-from app.modules.users.models import User, UserProfile, UserRole, UserRoleAssignment
+from app.modules.users.models import User, UserProfile
 from app.modules.auth.models import RefreshToken, LoginAttempt, PasswordResetToken
 
 asyncio.run(init_db())
