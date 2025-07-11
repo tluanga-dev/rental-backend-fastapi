@@ -796,21 +796,42 @@ class CategoryService:
     
     async def _to_response(self, category: Category) -> CategoryResponse:
         """Convert category model to response schema."""
+        # Extract all needed attributes first to avoid lazy loading issues
+        category_id = category.id
+        category_name = category.name
+        parent_category_id = category.parent_category_id
+        category_path = category.category_path
+        category_level = category.category_level
+        display_order = category.display_order
+        is_leaf = category.is_leaf
+        is_active = category.is_active
+        created_at = category.created_at
+        updated_at = category.updated_at
+        created_by = category.created_by
+        updated_by = category.updated_by
+        item_count = category.item_count
+        
+        # Calculate child count properly using repository to avoid async issues
+        child_count = 0
+        if not is_leaf:
+            children = await self.repository.get_children(category_id)
+            child_count = len(children)
+        
         return CategoryResponse(
-            id=category.id,
-            name=category.name,
-            parent_category_id=category.parent_category_id,
-            category_path=category.category_path,
-            category_level=category.category_level,
-            display_order=category.display_order,
-            is_leaf=category.is_leaf,
-            is_active=category.is_active,
-            created_at=category.created_at,
-            updated_at=category.updated_at,
-            created_by=category.created_by,
-            updated_by=category.updated_by,
-            child_count=category.child_count,
-            item_count=category.item_count,
+            id=category_id,
+            name=category_name,
+            parent_category_id=parent_category_id,
+            category_path=category_path,
+            category_level=category_level,
+            display_order=display_order,
+            is_leaf=is_leaf,
+            is_active=is_active,
+            created_at=created_at,
+            updated_at=updated_at,
+            created_by=created_by,
+            updated_by=updated_by,
+            child_count=child_count,
+            item_count=item_count,
             can_have_items=category.can_have_items(),
             can_have_children=category.can_have_children(),
             can_delete=category.can_delete(),
@@ -823,15 +844,33 @@ class CategoryService:
     
     async def _to_summary(self, category: Category) -> CategorySummary:
         """Convert category model to summary schema."""
+        # Avoid accessing category.id multiple times to prevent lazy loading issues
+        # Extract all needed attributes first
+        category_id = category.id
+        category_name = category.name
+        category_path = category.category_path
+        category_level = category.category_level
+        parent_category_id = category.parent_category_id
+        display_order = category.display_order
+        is_leaf = category.is_leaf
+        is_active = category.is_active
+        item_count = category.item_count
+        
+        # Calculate child count properly using repository to avoid async issues
+        child_count = 0
+        if not is_leaf:
+            children = await self.repository.get_children(category_id)
+            child_count = len(children)
+        
         return CategorySummary(
-            id=category.id,
-            name=category.name,
-            category_path=category.category_path,
-            category_level=category.category_level,
-            parent_category_id=category.parent_category_id,
-            display_order=category.display_order,
-            is_leaf=category.is_leaf,
-            is_active=category.is_active,
-            child_count=category.child_count,
-            item_count=category.item_count
+            id=category_id,
+            name=category_name,
+            category_path=category_path,
+            category_level=category_level,
+            parent_category_id=parent_category_id,
+            display_order=display_order,
+            is_leaf=is_leaf,
+            is_active=is_active,
+            child_count=child_count,
+            item_count=item_count
         )

@@ -35,9 +35,9 @@ class Category(BaseModel):
     display_order = Column(Integer, nullable=False, default=0, comment="Display order within parent")
     is_leaf = Column(Boolean, nullable=False, default=True, comment="True if category has no children")
     
-    # Self-referential relationship
-    parent = relationship("Category", remote_side="Category.id", back_populates="children")
-    children = relationship("Category", back_populates="parent", cascade="all, delete-orphan")
+    # Self-referential relationship - temporarily disabled to prevent async issues
+    # parent = relationship("Category", remote_side="Category.id", back_populates="children")
+    # children = relationship("Category", back_populates="parent", cascade="all, delete-orphan")
     
     # Items in this category
     # items = relationship("Item", back_populates="category", lazy="select")  # Temporarily disabled
@@ -236,15 +236,16 @@ class Category(BaseModel):
     @hybrid_property
     def child_count(self) -> int:
         """Get number of direct children."""
-        if self.children:
-            return len(self.children)
+        # Always return 0 to prevent lazy loading in async context
+        # Child count will be calculated explicitly in the service layer
         return 0
     
     @hybrid_property
     def item_count(self) -> int:
         """Get number of items in this category."""
-        if self.items:
-            return len(self.items)
+        # items relationship is temporarily disabled
+        # if self.items:
+        #     return len(self.items)
         return 0
     
     def can_have_items(self) -> bool:
@@ -324,7 +325,8 @@ class Category(BaseModel):
     @property
     def has_items(self) -> bool:
         """Check if category has items."""
-        return self.item_count > 0
+        # items relationship is temporarily disabled
+        return False
     
     def __str__(self) -> str:
         """String representation of category."""

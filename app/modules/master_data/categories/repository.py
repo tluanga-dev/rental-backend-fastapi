@@ -469,22 +469,16 @@ class CategoryRepository:
     
     async def get_categories_with_items(self) -> List[Category]:
         """Get categories that have items."""
-        query = select(Category).where(
-            and_(
-                Category.items.any(),
-                Category.is_active == True
-            )
-        ).order_by(Category.category_path)
-        result = await self.session.execute(query)
-        return result.scalars().all()
+        # Items relationship is temporarily disabled
+        # Return empty list for now
+        return []
     
     async def get_categories_without_items(self) -> List[Category]:
         """Get categories that have no items."""
+        # Items relationship is temporarily disabled
+        # Return all active categories for now
         query = select(Category).where(
-            and_(
-                ~Category.items.any(),
-                Category.is_active == True
-            )
+            Category.is_active == True
         ).order_by(Category.category_path)
         result = await self.session.execute(query)
         return result.scalars().all()
@@ -553,14 +547,8 @@ class CategoryRepository:
         max_depth = max_depth_result.scalar_one() or 0
         
         # Count categories with items
-        try:
-            with_items_query = select(func.count()).select_from(Category).where(
-                and_(Category.items.any(), Category.is_active == True)
-            )
-            with_items_result = await self.session.execute(with_items_query)
-            categories_with_items = with_items_result.scalar_one()
-        except:
-            categories_with_items = 0
+        # Items relationship is temporarily disabled
+        categories_with_items = 0
         
         # Calculate average children per category
         avg_children = 0
@@ -652,10 +640,12 @@ class CategoryRepository:
             elif key == "path_contains":
                 query = query.where(Category.category_path.ilike(f"%{value}%"))
             elif key == "has_items":
+                # Items relationship is temporarily disabled
+                # For now, assume no categories have items
                 if value:
-                    query = query.where(Category.items.any())
+                    query = query.where(False)  # No categories have items
                 else:
-                    query = query.where(~Category.items.any())
+                    query = query.where(True)   # All categories have no items
             elif key == "has_children":
                 if value:
                     query = query.where(Category.is_leaf == False)
