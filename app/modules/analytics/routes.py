@@ -22,7 +22,7 @@ from app.modules.analytics.schemas import (
 )
 
 
-router = APIRouter(prefix="/analytics", tags=["Analytics & System Management"])
+router = APIRouter(tags=["Analytics & System Management"])
 
 
 # Dependency to get analytics service

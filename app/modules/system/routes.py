@@ -13,7 +13,7 @@ from app.modules.system.models import (
 )
 
 
-router = APIRouter(prefix="/system", tags=["System Management"])
+router = APIRouter(tags=["System Management"])
 
 
 # Response models

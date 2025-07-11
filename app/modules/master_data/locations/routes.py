@@ -11,7 +11,7 @@ from app.modules.master_data.locations.schemas import (
 )
 
 
-router = APIRouter(prefix="/locations", tags=["Master Data - Locations"])
+router = APIRouter(tags=["Master Data - Locations"])
 
 
 # Dependency to get location service

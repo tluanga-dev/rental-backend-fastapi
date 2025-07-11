@@ -18,7 +18,7 @@ from app.core.errors import (
 )
 
 
-router = APIRouter(prefix="/categories", tags=["categories"])
+router = APIRouter(tags=["categories"])
 
 
 @router.post("/", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)

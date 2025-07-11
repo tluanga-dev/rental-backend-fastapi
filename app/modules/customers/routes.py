@@ -15,7 +15,7 @@ from app.modules.customers.schemas import (
 )
 
 
-router = APIRouter(prefix="/customers", tags=["Customer Management"])
+router = APIRouter(tags=["Customer Management"])
 
 
 # Dependency to get customer service

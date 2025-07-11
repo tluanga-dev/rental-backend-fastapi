@@ -7,6 +7,6 @@ from app.modules.master_data.locations.routes import router as locations_router
 router = APIRouter()
 
 # Include all master data sub-module routers
-router.include_router(brands_router, prefix="/brands", tags=["Brands"])
-router.include_router(categories_router, prefix="/categories", tags=["Categories"])
-router.include_router(locations_router, prefix="/locations", tags=["Locations"])
+router.include_router(brands_router, prefix="/brands")
+router.include_router(categories_router, prefix="/categories")
+router.include_router(locations_router, prefix="/locations")

@@ -18,7 +18,7 @@ from app.modules.transactions.schemas import (
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 
 
-router = APIRouter(prefix="/transactions", tags=["transactions"])
+router = APIRouter(tags=["transactions"])
 
 
 def get_transaction_service(session: AsyncSession = Depends(get_session)) -> TransactionService:

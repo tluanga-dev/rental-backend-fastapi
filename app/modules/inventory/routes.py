@@ -17,7 +17,7 @@ from app.modules.inventory.schemas import (
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 
 
-router = APIRouter(prefix="/inventory", tags=["inventory"])
+router = APIRouter(tags=["inventory"])
 
 
 def get_inventory_service(session: AsyncSession = Depends(get_session)) -> InventoryService:

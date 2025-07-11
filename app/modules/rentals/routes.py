@@ -20,7 +20,7 @@ from app.modules.rentals.schemas import (
 from app.modules.rentals.models import ReturnStatus, ReturnType, DamageLevel, InspectionStatus
 
 
-router = APIRouter(prefix="/rentals", tags=["Rental Operations"])
+router = APIRouter(tags=["Rental Operations"])
 
 
 # Import the rental service dependency

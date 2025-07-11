@@ -3,9 +3,30 @@ from uuid import UUID
 from sqlalchemy import select, func, or_, and_, desc, asc, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
+from pydantic import BaseModel
+from math import ceil
 
 from .models import Category, CategoryPath
 # from app.shared.pagination import Page
+
+
+class PageInfo(BaseModel):
+    """Pagination information."""
+    total_items: int
+    page: int
+    page_size: int
+    total_pages: int
+    has_next: bool
+    has_previous: bool
+
+
+class PaginationResult(BaseModel):
+    """Pagination result container."""
+    items: List[Category]
+    page_info: PageInfo
+    
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class CategoryRepository:
@@ -188,7 +209,7 @@ class CategoryRepository:
         sort_by: str = "name",
         sort_order: str = "asc",
         include_inactive: bool = False
-    ) -> List[Category]:
+    ) -> PaginationResult:
         """Get paginated categories."""
         query = select(Category)
         
@@ -199,6 +220,16 @@ class CategoryRepository:
         # Apply additional filters
         if filters:
             query = self._apply_filters(query, filters)
+        
+        # Get total count for pagination
+        count_query = select(func.count(Category.id))
+        if not include_inactive:
+            count_query = count_query.where(Category.is_active == True)
+        if filters:
+            count_query = self._apply_filters(count_query, filters)
+        
+        total_result = await self.session.execute(count_query)
+        total_items = total_result.scalar()
         
         # Apply sorting
         if sort_order.lower() == "desc":
@@ -211,7 +242,26 @@ class CategoryRepository:
         limit = page_size
         
         result = await self.session.execute(query.offset(skip).limit(limit))
-        return result.scalars().all()
+        items = result.scalars().all()
+        
+        # Calculate pagination info
+        total_pages = ceil(total_items / page_size) if page_size > 0 else 0
+        has_next = page < total_pages
+        has_previous = page > 1
+        
+        page_info = PageInfo(
+            total_items=total_items,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages,
+            has_next=has_next,
+            has_previous=has_previous
+        )
+        
+        return PaginationResult(
+            items=items,
+            page_info=page_info
+        )
     
     async def update(self, category_id: UUID, update_data: dict) -> Optional[Category]:
         """Update existing category."""

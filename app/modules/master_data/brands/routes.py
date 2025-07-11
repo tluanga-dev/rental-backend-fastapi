@@ -17,7 +17,7 @@ from app.core.errors import (
 )
 
 
-router = APIRouter(prefix="/brands", tags=["brands"])
+router = APIRouter(tags=["brands"])
 
 
 @router.post("/", response_model=BrandResponse, status_code=status.HTTP_201_CREATED)

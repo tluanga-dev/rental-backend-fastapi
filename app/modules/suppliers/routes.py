@@ -12,7 +12,7 @@ from app.modules.suppliers.schemas import (
 )
 
 
-router = APIRouter(prefix="/suppliers", tags=["Supplier Management"])
+router = APIRouter(tags=["Supplier Management"])
 
 
 # Dependency to get supplier service

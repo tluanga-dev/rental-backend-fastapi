@@ -32,7 +32,7 @@ TestingSessionLocal = async_sessionmaker(
 )
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def setup_test_db():
     """Setup test database"""
     async with test_engine.begin() as conn:
@@ -77,6 +77,7 @@ async def test_user(db_session: AsyncSession) -> User:
     user_service = UserService(db_session)
     
     user_data = {
+        "username": "testuser",
         "email": "test@example.com",
         "password": "TestPassword123",
         "full_name": "Test User",
@@ -93,6 +94,7 @@ async def test_superuser(db_session: AsyncSession) -> User:
     user_service = UserService(db_session)
     
     user_data = {
+        "username": "adminuser",
         "email": "admin@example.com",
         "password": "AdminPassword123",
         "full_name": "Admin User",
