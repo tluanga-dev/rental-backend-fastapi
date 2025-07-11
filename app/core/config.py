@@ -38,10 +38,14 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
-    # CORS Settings
+    # CORS Settings (deprecated - now managed by whitelist.json)
     ALLOWED_ORIGINS: str = Field(
         default="http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000"
     )
+    
+    # Whitelist Configuration
+    USE_WHITELIST_CONFIG: bool = Field(default=True, env="USE_WHITELIST_CONFIG")
+    WHITELIST_CONFIG_PATH: Optional[str] = Field(default=None, env="WHITELIST_CONFIG_PATH")
     
     # Password Settings
     PASSWORD_MIN_LENGTH: int = 8
@@ -65,6 +69,15 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> List[str]:
         """Get CORS origins as a list"""
+        if self.USE_WHITELIST_CONFIG:
+            try:
+                from app.core.whitelist import get_cors_origins
+                return get_cors_origins()
+            except ImportError:
+                # Fallback to old method if whitelist module is not available
+                pass
+        
+        # Fallback to environment variable configuration
         if not self.ALLOWED_ORIGINS:
             return []
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]

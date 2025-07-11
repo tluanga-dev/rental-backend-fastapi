@@ -11,6 +11,7 @@ from app.modules.system.service import SystemService
 from app.modules.system.models import (
     SettingType, SettingCategory, BackupStatus, BackupType, AuditAction
 )
+from app.modules.system.whitelist_routes import router as whitelist_router
 
 
 router = APIRouter(tags=["System Management"])
@@ -567,3 +568,7 @@ async def get_backups_by_status(
 async def health_check():
     """Health check endpoint for system management."""
     return {"status": "healthy", "service": "system-management"}
+
+
+# Include whitelist management routes
+router.include_router(whitelist_router, prefix="/whitelist", tags=["Whitelist Management"])

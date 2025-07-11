@@ -6,6 +6,7 @@ import logging
 
 from app.core.config import settings
 from app.core.database import engine
+from app.core.middleware import WhitelistMiddleware, EndpointAccessMiddleware
 from app.db.base import Base
 from app.shared.exceptions import CustomHTTPException
 
@@ -48,13 +49,31 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
+# Add custom whitelist middleware (before CORS)
+app.add_middleware(WhitelistMiddleware, enabled=settings.USE_WHITELIST_CONFIG)
+app.add_middleware(EndpointAccessMiddleware, enabled=settings.USE_WHITELIST_CONFIG)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=[
+        "Origin",
+        "Content-Type", 
+        "Accept",
+        "Authorization",
+        "X-Requested-With",
+        "X-Request-ID",
+        "Cache-Control"
+    ],
+    expose_headers=[
+        "X-Total-Count",
+        "X-Page-Count", 
+        "X-Has-Next",
+        "X-Has-Previous"
+    ],
 )
 
 # Custom exception handler

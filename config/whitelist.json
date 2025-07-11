@@ -1,0 +1,117 @@
+{
+  "cors_origins": {
+    "localhost_range": {
+      "enabled": true,
+      "start_port": 3000,
+      "end_port": 3050,
+      "protocols": ["http", "https"]
+    },
+    "localhost_aliases": {
+      "enabled": true,
+      "aliases": ["localhost", "127.0.0.1", "0.0.0.0"]
+    },
+    "additional_origins": [
+      "http://localhost:8000",
+      "https://localhost:8000",
+      "http://127.0.0.1:8000",
+      "https://127.0.0.1:8000"
+    ],
+    "development": {
+      "enabled": true,
+      "origins": [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:8080",
+        "http://localhost:8081"
+      ]
+    },
+    "production": {
+      "enabled": false,
+      "origins": [
+        "https://yourdomain.com",
+        "https://www.yourdomain.com",
+        "https://api.yourdomain.com"
+      ]
+    }
+  },
+  "api_endpoints": {
+    "whitelist_enabled": true,
+    "default_access": "restricted",
+    "public_endpoints": [
+      "/health",
+      "/docs",
+      "/redoc",
+      "/openapi.json",
+      "/api/auth/login",
+      "/api/auth/register",
+      "/api/auth/refresh"
+    ],
+    "protected_endpoints": [
+      "/api/auth/me",
+      "/api/auth/logout",
+      "/api/auth/change-password",
+      "/api/users/**",
+      "/api/master-data/**",
+      "/api/customers/**",
+      "/api/suppliers/**",
+      "/api/inventory/**",
+      "/api/transactions/**",
+      "/api/rentals/**",
+      "/api/analytics/**",
+      "/api/system/**"
+    ],
+    "admin_only_endpoints": [
+      "/api/users/",
+      "/api/users/{user_id}",
+      "/api/users/{user_id}/status",
+      "/api/users/roles/",
+      "/api/system/system/settings",
+      "/api/system/system/backups",
+      "/api/analytics/analytics/reports/admin"
+    ]
+  },
+  "rate_limiting": {
+    "enabled": true,
+    "global_rate_limit": {
+      "requests": 1000,
+      "window": "1h"
+    },
+    "endpoint_specific": {
+      "/api/auth/login": {
+        "requests": 5,
+        "window": "15m"
+      },
+      "/api/auth/register": {
+        "requests": 3,
+        "window": "1h"
+      },
+      "/api/auth/refresh": {
+        "requests": 10,
+        "window": "1h"
+      }
+    }
+  },
+  "security": {
+    "require_https": false,
+    "allowed_methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    "allowed_headers": [
+      "Origin",
+      "Content-Type",
+      "Accept",
+      "Authorization",
+      "X-Requested-With",
+      "X-Request-ID",
+      "Cache-Control"
+    ],
+    "expose_headers": [
+      "X-Total-Count",
+      "X-Page-Count",
+      "X-Has-Next",
+      "X-Has-Previous"
+    ],
+    "max_age": 3600
+  }
+}
