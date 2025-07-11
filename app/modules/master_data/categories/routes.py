@@ -47,6 +47,18 @@ async def create_category(
         )
 
 
+@router.get("/parents/", response_model=List[CategorySummary])
+async def get_parent_categories(
+    service: CategoryService = Depends(get_category_service)
+):
+    """Get all categories that are not marked as leaf (is_leaf = False).
+    
+    This includes both categories that currently have children and categories
+    that are marked as non-leaf but don't currently have subcategories.
+    """
+    return await service.get_parent_categories()
+
+
 @router.get("/{category_id}", response_model=CategoryResponse)
 async def get_category(
     category_id: UUID,

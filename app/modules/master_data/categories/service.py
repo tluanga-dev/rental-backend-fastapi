@@ -485,6 +485,18 @@ class CategoryService:
         categories = await self.repository.get_leaf_categories()
         return [await self._to_summary(cat) for cat in categories]
     
+    async def get_parent_categories(self) -> List[CategorySummary]:
+        """Get all categories that are not marked as leaf (is_leaf = False).
+        
+        This includes both categories that currently have children and categories
+        that are marked as non-leaf but don't currently have subcategories.
+        
+        Returns:
+            List of non-leaf category summaries
+        """
+        categories = await self.repository.get_parent_categories()
+        return [await self._to_summary(cat) for cat in categories]
+    
     async def get_category_children(self, parent_id: UUID) -> List[CategorySummary]:
         """Get direct children of a category.
         

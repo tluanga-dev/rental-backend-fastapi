@@ -456,6 +456,17 @@ class CategoryRepository:
         result = await self.session.execute(query)
         return result.scalars().all()
     
+    async def get_parent_categories(self) -> List[Category]:
+        """Get all categories that are not marked as leaf (is_leaf = False)."""
+        query = select(Category).where(
+            and_(
+                Category.is_leaf == False,
+                Category.is_active == True
+            )
+        ).order_by(Category.category_path)
+        result = await self.session.execute(query)
+        return result.scalars().all()
+    
     async def get_categories_by_level(self, level: int) -> List[Category]:
         """Get all categories at a specific level."""
         query = select(Category).where(
