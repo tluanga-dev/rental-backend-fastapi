@@ -34,12 +34,9 @@ class Item(BaseModel):
         brand_id: Brand ID
         category_id: Category ID
         unit_of_measurement_id: Unit of measurement ID
-        rental_price_per_day: Rental price per day
-        rental_price_per_week: Rental price per week
-        rental_price_per_month: Rental price per month
+        rental_rate_per_period: Rental rate per period
+        rental_period: Rental period specification
         sale_price: Sale price
-        minimum_rental_days: Minimum rental days
-        maximum_rental_days: Maximum rental days
         security_deposit: Security deposit amount
         description: Item description
         specifications: Item specifications
@@ -68,12 +65,9 @@ class Item(BaseModel):
     brand_id = Column(UUIDType(), ForeignKey("brands.id"), nullable=True, comment="Brand ID")
     category_id = Column(UUIDType(), ForeignKey("categories.id"), nullable=True, comment="Category ID")
     unit_of_measurement_id = Column(UUIDType(), ForeignKey("units_of_measurement.id"), nullable=False, comment="Unit of measurement ID")
-    rental_price_per_day = Column(Numeric(10, 2), nullable=True, comment="Rental price per day")
-    rental_price_per_week = Column(Numeric(10, 2), nullable=True, comment="Rental price per week")
-    rental_price_per_month = Column(Numeric(10, 2), nullable=True, comment="Rental price per month")
+    rental_rate_per_period = Column(Numeric(10, 2), nullable=True, comment="Rental rate per period")
+    rental_period = Column(String(20), nullable=True, default="daily", comment="Rental period (daily, weekly, monthly)")
     sale_price = Column(Numeric(10, 2), nullable=True, comment="Sale price")
-    minimum_rental_days = Column(String(10), nullable=True, comment="Minimum rental days")
-    maximum_rental_days = Column(String(10), nullable=True, comment="Maximum rental days")
     security_deposit = Column(Numeric(10, 2), nullable=False, default=0.00, comment="Security deposit")
     description = Column(Text, nullable=True, comment="Item description")
     specifications = Column(Text, nullable=True, comment="Item specifications")
@@ -155,14 +149,8 @@ class Item(BaseModel):
                 raise ValueError("Item must be either rentable or saleable")
         
         # Price validation
-        if self.rental_price_per_day and self.rental_price_per_day < 0:
-            raise ValueError("Rental price per day cannot be negative")
-        
-        if self.rental_price_per_week and self.rental_price_per_week < 0:
-            raise ValueError("Rental price per week cannot be negative")
-        
-        if self.rental_price_per_month and self.rental_price_per_month < 0:
-            raise ValueError("Rental price per month cannot be negative")
+        if self.rental_rate_per_period and self.rental_rate_per_period < 0:
+            raise ValueError("Rental rate per period cannot be negative")
         
         if self.sale_price and self.sale_price < 0:
             raise ValueError("Sale price cannot be negative")
@@ -170,24 +158,9 @@ class Item(BaseModel):
         if self.security_deposit < 0:
             raise ValueError("Security deposit cannot be negative")
         
-        # Rental days validation
-        if self.minimum_rental_days:
-            try:
-                min_days = int(self.minimum_rental_days)
-                if min_days < 0:
-                    raise ValueError("Minimum rental days cannot be negative")
-            except ValueError:
-                raise ValueError("Minimum rental days must be a valid number")
-        
-        if self.maximum_rental_days:
-            try:
-                max_days = int(self.maximum_rental_days)
-                if max_days < 0:
-                    raise ValueError("Maximum rental days cannot be negative")
-                if self.minimum_rental_days and max_days < int(self.minimum_rental_days):
-                    raise ValueError("Maximum rental days cannot be less than minimum rental days")
-            except ValueError:
-                raise ValueError("Maximum rental days must be a valid number")
+        # Rental period validation
+        if self.rental_period and self.rental_period not in ["daily", "weekly", "monthly", "hourly"]:
+            raise ValueError("Rental period must be one of: daily, weekly, monthly, hourly")
     
     
     def is_rental_item(self) -> bool:
@@ -208,7 +181,7 @@ class Item(BaseModel):
     
     def can_be_rented(self) -> bool:
         """Check if item can be rented."""
-        return self.is_rental_item() and self.is_item_active() and self.rental_price_per_day
+        return self.is_rental_item() and self.is_item_active() and self.rental_rate_per_period
     
     def can_be_sold(self) -> bool:
         """Check if item can be sold."""

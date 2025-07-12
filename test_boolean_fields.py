@@ -33,7 +33,7 @@ async def test_boolean_field_validation():
                 'unit_of_measurement_id': test_uom_id,
                 'is_rentable': combo["is_rentable"],
                 'is_saleable': combo["is_saleable"],
-                'rental_price_per_day': 25.00 if combo["is_rentable"] else None,
+                'rental_rate_per_period': 25.00 if combo["is_rentable"] else None,
                 'sale_price': 50.00 if combo["is_saleable"] else None
             }
             item = ItemCreate(**item_data)
@@ -56,7 +56,7 @@ async def test_boolean_field_validation():
                 'unit_of_measurement_id': test_uom_id,
                 'is_rentable': combo["is_rentable"],
                 'is_saleable': combo["is_saleable"],
-                'rental_price_per_day': 25.00
+                'rental_rate_per_period': 25.00
             }
             item = ItemCreate(**item_data)
             print(f"   ❌ {combo['description']}: Should have failed but didn't")
@@ -70,7 +70,7 @@ async def test_boolean_field_validation():
         default_item_data = {
             'item_name': 'Default Test Item',
             'unit_of_measurement_id': test_uom_id,
-            'rental_price_per_day': 25.00
+            'rental_rate_per_period': 25.00
             # Not specifying is_rentable or is_saleable to test defaults
         }
         default_item = ItemCreate(**default_item_data)
@@ -113,7 +113,7 @@ async def test_boolean_field_validation():
         {
             "is_rentable": True, 
             "is_saleable": False,
-            "rental_price_per_day": None,
+            "rental_rate_per_period": None,
             "sale_price": None,
             "valid": False,
             "description": "Rentable without rental price"
@@ -121,7 +121,7 @@ async def test_boolean_field_validation():
         {
             "is_rentable": False, 
             "is_saleable": True,
-            "rental_price_per_day": None,
+            "rental_rate_per_period": None,
             "sale_price": None,
             "valid": False,
             "description": "Saleable without sale price"
@@ -129,7 +129,7 @@ async def test_boolean_field_validation():
         {
             "is_rentable": True, 
             "is_saleable": False,
-            "rental_price_per_day": 25.00,
+            "rental_rate_per_period": 25.00,
             "sale_price": None,
             "valid": True,
             "description": "Rentable with rental price"
@@ -137,7 +137,7 @@ async def test_boolean_field_validation():
         {
             "is_rentable": False, 
             "is_saleable": True,
-            "rental_price_per_day": None,
+            "rental_rate_per_period": None,
             "sale_price": 50.00,
             "valid": True,
             "description": "Saleable with sale price"
@@ -152,8 +152,8 @@ async def test_boolean_field_validation():
                 'is_rentable': test['is_rentable'],
                 'is_saleable': test['is_saleable'],
             }
-            if test['rental_price_per_day']:
-                item_data['rental_price_per_day'] = test['rental_price_per_day']
+            if test['rental_rate_per_period']:
+                item_data['rental_rate_per_period'] = test['rental_rate_per_period']
             if test['sale_price']:
                 item_data['sale_price'] = test['sale_price']
                 

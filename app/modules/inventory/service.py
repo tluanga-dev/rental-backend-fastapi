@@ -120,8 +120,7 @@ class InventoryService:
         
         # Validate pricing if relevant fields are being updated
         if any(field in item_data.model_dump(exclude_unset=True) for field in [
-            'item_type', 'rental_price_per_day', 'rental_price_per_week', 
-            'rental_price_per_month', 'sale_price'
+            'rental_rate_per_period', 'rental_period', 'sale_price'
         ]):
             self._validate_item_pricing_update(existing_item, item_data)
         
@@ -435,8 +434,8 @@ class InventoryService:
     def _validate_item_pricing(self, item_data: ItemCreate):
         """Validate item pricing based on boolean fields."""
         if item_data.is_rentable:
-            if not item_data.rental_price_per_day:
-                raise ValidationError("Rental price per day is required for rentable items")
+            if not item_data.rental_rate_per_period:
+                raise ValidationError("Rental rate per period is required for rentable items")
         
         if item_data.is_saleable:
             if not item_data.sale_price:
@@ -449,7 +448,7 @@ class InventoryService:
         is_saleable = item_data.is_saleable if item_data.is_saleable is not None else existing_item.is_saleable
         
         # Get effective pricing after update
-        rental_price = item_data.rental_price_per_day if item_data.rental_price_per_day is not None else existing_item.rental_price_per_day
+        rental_price = item_data.rental_rate_per_period if item_data.rental_rate_per_period is not None else existing_item.rental_rate_per_period
         sale_price = item_data.sale_price if item_data.sale_price is not None else existing_item.sale_price
         
         if is_rentable:

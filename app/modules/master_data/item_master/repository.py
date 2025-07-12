@@ -30,18 +30,12 @@ class ItemMasterRepository:
             item.category_id = item_data.category_id
         # Set required field
         item.unit_of_measurement_id = item_data.unit_of_measurement_id
-        if item_data.rental_price_per_day:
-            item.rental_price_per_day = item_data.rental_price_per_day
-        if item_data.rental_price_per_week:
-            item.rental_price_per_week = item_data.rental_price_per_week
-        if item_data.rental_price_per_month:
-            item.rental_price_per_month = item_data.rental_price_per_month
+        if item_data.rental_rate_per_period:
+            item.rental_rate_per_period = item_data.rental_rate_per_period
+        if item_data.rental_period:
+            item.rental_period = item_data.rental_period
         if item_data.sale_price:
             item.sale_price = item_data.sale_price
-        if item_data.minimum_rental_days:
-            item.minimum_rental_days = item_data.minimum_rental_days
-        if item_data.maximum_rental_days:
-            item.maximum_rental_days = item_data.maximum_rental_days
         if item_data.security_deposit:
             item.security_deposit = item_data.security_deposit
         if item_data.description:

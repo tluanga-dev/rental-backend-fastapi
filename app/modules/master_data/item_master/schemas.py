@@ -16,12 +16,9 @@ class ItemCreate(BaseModel):
     brand_id: Optional[UUID] = Field(None, description="Brand ID")
     category_id: Optional[UUID] = Field(None, description="Category ID")
     unit_of_measurement_id: UUID = Field(..., description="Unit of measurement ID")
-    rental_price_per_day: Optional[Decimal] = Field(None, ge=0, description="Rental price per day")
-    rental_price_per_week: Optional[Decimal] = Field(None, ge=0, description="Rental price per week")
-    rental_price_per_month: Optional[Decimal] = Field(None, ge=0, description="Rental price per month")
+    rental_rate_per_period: Optional[Decimal] = Field(None, ge=0, description="Rental rate per period")
+    rental_period: Optional[str] = Field(default="daily", description="Rental period (daily, weekly, monthly, hourly)")
     sale_price: Optional[Decimal] = Field(None, ge=0, description="Sale price")
-    minimum_rental_days: Optional[str] = Field(None, description="Minimum rental days")
-    maximum_rental_days: Optional[str] = Field(None, description="Maximum rental days")
     security_deposit: Decimal = Field(default=Decimal("0.00"), ge=0, description="Security deposit")
     description: Optional[str] = Field(None, description="Item description")
     specifications: Optional[str] = Field(None, description="Item specifications")
@@ -33,7 +30,7 @@ class ItemCreate(BaseModel):
     is_rentable: bool = Field(default=True, description="Item can be rented")
     is_saleable: bool = Field(default=False, description="Item can be sold")
     
-    @field_validator('minimum_rental_days', 'maximum_rental_days', 'warranty_period_days', 'reorder_level', 'reorder_quantity')
+    @field_validator('warranty_period_days', 'reorder_level', 'reorder_quantity')
     @classmethod
     def validate_numeric_string(cls, v):
         if v is not None and v != "":
@@ -43,17 +40,11 @@ class ItemCreate(BaseModel):
                 raise ValueError("Must be a valid number")
         return v
     
-    @field_validator('maximum_rental_days')
+    @field_validator('rental_period')
     @classmethod
-    def validate_max_rental_days(cls, v, info):
-        if v is not None and info.data.get('minimum_rental_days') is not None:
-            try:
-                min_days = int(info.data.get('minimum_rental_days'))
-                max_days = int(v)
-                if max_days < min_days:
-                    raise ValueError("Maximum rental days cannot be less than minimum rental days")
-            except ValueError:
-                pass
+    def validate_rental_period(cls, v):
+        if v is not None and v not in ["daily", "weekly", "monthly", "hourly"]:
+            raise ValueError("Rental period must be one of: daily, weekly, monthly, hourly")
         return v
     
     @field_validator('is_saleable')
@@ -80,12 +71,9 @@ class ItemUpdate(BaseModel):
     brand_id: Optional[UUID] = Field(None, description="Brand ID")
     category_id: Optional[UUID] = Field(None, description="Category ID")
     unit_of_measurement_id: Optional[UUID] = Field(None, description="Unit of measurement ID")
-    rental_price_per_day: Optional[Decimal] = Field(None, ge=0, description="Rental price per day")
-    rental_price_per_week: Optional[Decimal] = Field(None, ge=0, description="Rental price per week")
-    rental_price_per_month: Optional[Decimal] = Field(None, ge=0, description="Rental price per month")
+    rental_rate_per_period: Optional[Decimal] = Field(None, ge=0, description="Rental rate per period")
+    rental_period: Optional[str] = Field(None, description="Rental period (daily, weekly, monthly, hourly)")
     sale_price: Optional[Decimal] = Field(None, ge=0, description="Sale price")
-    minimum_rental_days: Optional[str] = Field(None, description="Minimum rental days")
-    maximum_rental_days: Optional[str] = Field(None, description="Maximum rental days")
     security_deposit: Optional[Decimal] = Field(None, ge=0, description="Security deposit")
     description: Optional[str] = Field(None, description="Item description")
     specifications: Optional[str] = Field(None, description="Item specifications")
@@ -97,7 +85,7 @@ class ItemUpdate(BaseModel):
     is_rentable: Optional[bool] = Field(None, description="Item can be rented")
     is_saleable: Optional[bool] = Field(None, description="Item can be sold")
     
-    @field_validator('minimum_rental_days', 'maximum_rental_days', 'warranty_period_days', 'reorder_level', 'reorder_quantity')
+    @field_validator('warranty_period_days', 'reorder_level', 'reorder_quantity')
     @classmethod
     def validate_numeric_string(cls, v):
         if v is not None and v != "":
@@ -129,12 +117,9 @@ class ItemResponse(BaseModel):
     brand_id: Optional[UUID]
     category_id: Optional[UUID]
     unit_of_measurement_id: UUID
-    rental_price_per_day: Optional[Decimal]
-    rental_price_per_week: Optional[Decimal]
-    rental_price_per_month: Optional[Decimal]
+    rental_rate_per_period: Optional[Decimal]
+    rental_period: Optional[str]
     sale_price: Optional[Decimal]
-    minimum_rental_days: Optional[str]
-    maximum_rental_days: Optional[str]
     security_deposit: Decimal
     description: Optional[str]
     specifications: Optional[str]
@@ -173,7 +158,7 @@ class ItemListResponse(BaseModel):
     sku: str
     item_name: str
     item_status: ItemStatus
-    rental_price_per_day: Optional[Decimal]
+    rental_rate_per_period: Optional[Decimal]
     sale_price: Optional[Decimal]
     is_rentable: bool
     is_saleable: bool
@@ -198,12 +183,9 @@ class ItemWithInventoryResponse(BaseModel):
     brand_id: Optional[UUID]
     category_id: Optional[UUID]
     unit_of_measurement_id: UUID
-    rental_price_per_day: Optional[Decimal]
-    rental_price_per_week: Optional[Decimal]
-    rental_price_per_month: Optional[Decimal]
+    rental_rate_per_period: Optional[Decimal]
+    rental_period: Optional[str]
     sale_price: Optional[Decimal]
-    minimum_rental_days: Optional[str]
-    maximum_rental_days: Optional[str]
     security_deposit: Decimal
     description: Optional[str]
     specifications: Optional[str]

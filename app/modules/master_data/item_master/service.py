@@ -130,7 +130,7 @@ class ItemMasterService:
         if any([
             item_data.is_rentable is not None,
             item_data.is_saleable is not None,
-            item_data.rental_price_per_day is not None,
+            item_data.rental_rate_per_period is not None,
             item_data.sale_price is not None
         ]):
             self._validate_item_pricing_update(existing_item, item_data)
@@ -214,8 +214,8 @@ class ItemMasterService:
     def _validate_item_pricing(self, item_data: ItemCreate):
         """Validate item pricing based on boolean fields."""
         if item_data.is_rentable:
-            if not item_data.rental_price_per_day:
-                raise ValidationError("Rental price per day is required for rentable items")
+            if not item_data.rental_rate_per_period:
+                raise ValidationError("Rental rate per period is required for rentable items")
         
         if item_data.is_saleable:
             if not item_data.sale_price:
@@ -228,12 +228,12 @@ class ItemMasterService:
         is_saleable = item_data.is_saleable if item_data.is_saleable is not None else existing_item.is_saleable
         
         # Get effective pricing after update
-        rental_price = item_data.rental_price_per_day if item_data.rental_price_per_day is not None else existing_item.rental_price_per_day
+        rental_rate = item_data.rental_rate_per_period if item_data.rental_rate_per_period is not None else existing_item.rental_rate_per_period
         sale_price = item_data.sale_price if item_data.sale_price is not None else existing_item.sale_price
         
         if is_rentable:
-            if not rental_price:
-                raise ValidationError("Rental price per day is required for rentable items")
+            if not rental_rate:
+                raise ValidationError("Rental rate per period is required for rentable items")
         
         if is_saleable:
             if not sale_price:
