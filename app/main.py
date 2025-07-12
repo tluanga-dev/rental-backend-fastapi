@@ -56,18 +56,10 @@ app.add_middleware(EndpointAccessMiddleware, enabled=settings.USE_WHITELIST_CONF
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=[
-        "Origin",
-        "Content-Type", 
-        "Accept",
-        "Authorization",
-        "X-Requested-With",
-        "X-Request-ID",
-        "Cache-Control"
-    ],
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=False,  # Must be False when allow_origins=["*"]
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
     expose_headers=[
         "X-Total-Count",
         "X-Page-Count", 
