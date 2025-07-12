@@ -5,20 +5,22 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError, ValidationError, ConflictError
+from app.modules.master_data.item_master.models import Item, ItemStatus
 from app.modules.inventory.models import (
-    Item, InventoryUnit, StockLevel, 
-    ItemType, ItemStatus, InventoryUnitStatus, InventoryUnitCondition
+    InventoryUnit, StockLevel, InventoryUnitStatus, InventoryUnitCondition
 )
 from app.modules.inventory.repository import (
     ItemRepository, InventoryUnitRepository, StockLevelRepository
 )
+from app.modules.master_data.item_master.schemas import (
+    ItemCreate, ItemUpdate, ItemResponse, ItemListResponse, ItemWithInventoryResponse,
+    SKUGenerationRequest, SKUGenerationResponse, SKUBulkGenerationResponse
+)
 from app.modules.inventory.schemas import (
-    ItemCreate, ItemUpdate, ItemResponse, ItemListResponse,
     InventoryUnitCreate, InventoryUnitUpdate, InventoryUnitResponse,
     StockLevelCreate, StockLevelUpdate, StockLevelResponse,
     StockAdjustment, StockReservation, StockReservationRelease,
-    InventoryReport, ItemWithInventoryResponse,
-    SKUGenerationRequest, SKUGenerationResponse, SKUBulkGenerationResponse
+    InventoryReport
 )
 from app.shared.utils.sku_generator import SKUGenerator
 
@@ -75,7 +77,6 @@ class InventoryService:
         self, 
         skip: int = 0, 
         limit: int = 100,
-        item_type: Optional[ItemType] = None,
         item_status: Optional[ItemStatus] = None,
         brand_id: Optional[UUID] = None,
         category_id: Optional[UUID] = None,
@@ -85,7 +86,6 @@ class InventoryService:
         items = await self.item_repository.get_all(
             skip=skip,
             limit=limit,
-            item_type=item_type,
             item_status=item_status,
             brand_id=brand_id,
             category_id=category_id,
@@ -433,39 +433,32 @@ class InventoryService:
     
     # Helper methods
     def _validate_item_pricing(self, item_data: ItemCreate):
-        """Validate item pricing based on type."""
-        if item_data.item_type == ItemType.RENTAL:
+        """Validate item pricing based on boolean fields."""
+        if item_data.is_rentable:
             if not item_data.rental_price_per_day:
-                raise ValidationError("Rental price per day is required for rental items")
-        elif item_data.item_type == ItemType.SALE:
+                raise ValidationError("Rental price per day is required for rentable items")
+        
+        if item_data.is_saleable:
             if not item_data.sale_price:
-                raise ValidationError("Sale price is required for sale items")
-        elif item_data.item_type == ItemType.BOTH:
-            if not item_data.rental_price_per_day:
-                raise ValidationError("Rental price per day is required for rental/sale items")
-            if not item_data.sale_price:
-                raise ValidationError("Sale price is required for rental/sale items")
+                raise ValidationError("Sale price is required for saleable items")
     
     def _validate_item_pricing_update(self, existing_item: Item, item_data: ItemUpdate):
         """Validate item pricing for updates."""
-        # Get the effective item type after update
-        item_type = item_data.item_type if item_data.item_type else existing_item.item_type
+        # Get effective boolean fields after update
+        is_rentable = item_data.is_rentable if item_data.is_rentable is not None else existing_item.is_rentable
+        is_saleable = item_data.is_saleable if item_data.is_saleable is not None else existing_item.is_saleable
         
         # Get effective pricing after update
         rental_price = item_data.rental_price_per_day if item_data.rental_price_per_day is not None else existing_item.rental_price_per_day
         sale_price = item_data.sale_price if item_data.sale_price is not None else existing_item.sale_price
         
-        if item_type == ItemType.RENTAL:
+        if is_rentable:
             if not rental_price:
-                raise ValidationError("Rental price per day is required for rental items")
-        elif item_type == ItemType.SALE:
+                raise ValidationError("Rental price per day is required for rentable items")
+        
+        if is_saleable:
             if not sale_price:
-                raise ValidationError("Sale price is required for sale items")
-        elif item_type == ItemType.BOTH:
-            if not rental_price:
-                raise ValidationError("Rental price per day is required for rental/sale items")
-            if not sale_price:
-                raise ValidationError("Sale price is required for rental/sale items")
+                raise ValidationError("Sale price is required for saleable items")
     
     def _validate_status_transition(self, current_status: str, new_status: InventoryUnitStatus):
         """Validate inventory unit status transitions."""

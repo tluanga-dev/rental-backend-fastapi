@@ -5,7 +5,7 @@ from sqlalchemy.orm import relationship, validates
 from app.db.base import BaseModel, NamedModelMixin
 
 if TYPE_CHECKING:
-    from app.modules.inventory.models import Item
+    from app.modules.master_data.item_master.models import Item
 
 
 class UnitOfMeasurement(BaseModel, NamedModelMixin):
@@ -26,7 +26,7 @@ class UnitOfMeasurement(BaseModel, NamedModelMixin):
     abbreviation = Column(String(10), nullable=True, unique=True, index=True, comment="Unit abbreviation")
     
     # Relationships
-    # items = relationship("Item", back_populates="unit_of_measurement", lazy="select")  # Temporarily disabled
+    items = relationship("Item", back_populates="unit_of_measurement", lazy="select")
     
     # Indexes for efficient queries
     __table_args__ = (

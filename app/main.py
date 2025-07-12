@@ -17,9 +17,10 @@ from app.modules.master_data.brands.models import Brand
 from app.modules.master_data.categories.models import Category
 from app.modules.master_data.locations.models import Location
 from app.modules.master_data.units.models import UnitOfMeasurement
+from app.modules.master_data.item_master.models import Item
 from app.modules.suppliers.models import Supplier
 from app.modules.customers.models import Customer
-from app.modules.inventory.models import Item, InventoryUnit, StockLevel, SKUSequence
+from app.modules.inventory.models import InventoryUnit, StockLevel, SKUSequence
 from app.modules.transactions.models import TransactionHeader, TransactionLine
 from app.modules.rentals.models import RentalReturn, RentalReturnLine, InspectionReport
 from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
@@ -46,7 +47,53 @@ app = FastAPI(
     version=settings.PROJECT_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
+    openapi_tags=[
+        {
+            "name": "Authentication",
+            "description": "User authentication and authorization operations"
+        },
+        {
+            "name": "Users",
+            "description": "User management operations"
+        },
+        {
+            "name": "Master Data",
+            "description": "Master data management operations"
+        },
+        {
+            "name": "Items",
+            "description": "Item master data operations - create, read, update, delete items with search and filtering"
+        },
+        {
+            "name": "Suppliers",
+            "description": "Supplier management operations"
+        },
+        {
+            "name": "Customers",
+            "description": "Customer management operations"
+        },
+        {
+            "name": "Inventory",
+            "description": "Inventory management operations"
+        },
+        {
+            "name": "Transactions",
+            "description": "Transaction management operations"
+        },
+        {
+            "name": "Rentals",
+            "description": "Rental management operations"
+        },
+        {
+            "name": "Analytics",
+            "description": "Analytics and reporting operations"
+        },
+        {
+            "name": "System",
+            "description": "System administration operations"
+        }
+    ]
 )
 
 # Add custom whitelist middleware (before CORS)

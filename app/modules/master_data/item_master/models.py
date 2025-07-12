@@ -14,11 +14,6 @@ if TYPE_CHECKING:
     from app.modules.transactions.models import TransactionLine
 
 
-class ItemType(str, Enum):
-    """Item type enumeration."""
-    RENTAL = "RENTAL"
-    SALE = "SALE"
-    BOTH = "BOTH"
 
 
 class ItemStatus(str, Enum):
@@ -33,10 +28,8 @@ class Item(BaseModel):
     Item model for master data management.
     
     Attributes:
-        item_code: Unique item code
         sku: Stock Keeping Unit
         item_name: Item name
-        item_type: Type of item (RENTAL, SALE, BOTH)
         item_status: Status of item (ACTIVE, INACTIVE, DISCONTINUED)
         brand_id: Brand ID
         category_id: Category ID
@@ -69,10 +62,8 @@ class Item(BaseModel):
     
     __tablename__ = "items"
     
-    item_code = Column(String(50), nullable=False, unique=True, index=True, comment="Unique item code")
     sku = Column(String(50), nullable=False, unique=True, index=True, comment="Stock Keeping Unit")
     item_name = Column(String(200), nullable=False, comment="Item name")
-    item_type = Column(String(20), nullable=False, comment="Item type")
     item_status = Column(String(20), nullable=False, default=ItemStatus.ACTIVE.value, comment="Item status")
     brand_id = Column(UUIDType(), ForeignKey("brands.id"), nullable=True, comment="Brand ID")
     category_id = Column(UUIDType(), ForeignKey("categories.id"), nullable=True, comment="Category ID")
@@ -104,10 +95,8 @@ class Item(BaseModel):
     
     # Indexes for efficient queries
     __table_args__ = (
-        Index('idx_item_code', 'item_code'),
         Index('idx_item_sku', 'sku'),
         Index('idx_item_name', 'item_name'),
-        Index('idx_item_type', 'item_type'),
         Index('idx_item_status', 'item_status'),
         Index('idx_item_brand', 'brand_id'),
         Index('idx_item_category', 'category_id'),
@@ -115,10 +104,8 @@ class Item(BaseModel):
     
     def __init__(
         self,
-        item_code: str,
         sku: str,
         item_name: str,
-        item_type: ItemType,
         item_status: ItemStatus = ItemStatus.ACTIVE,
         is_rentable: bool = True,
         is_saleable: bool = False,
@@ -128,20 +115,16 @@ class Item(BaseModel):
         Initialize an Item.
         
         Args:
-            item_code: Unique item code
             sku: Stock Keeping Unit
             item_name: Item name
-            item_type: Type of item
             item_status: Status of item
             is_rentable: Item can be rented (default: True)
             is_saleable: Item can be sold (default: False)
             **kwargs: Additional BaseModel fields
         """
         super().__init__(**kwargs)
-        self.item_code = item_code
         self.sku = sku
         self.item_name = item_name
-        self.item_type = item_type.value if isinstance(item_type, ItemType) else item_type
         self.item_status = item_status.value if isinstance(item_status, ItemStatus) else item_status
         self.is_rentable = is_rentable
         self.is_saleable = is_saleable
@@ -153,23 +136,12 @@ class Item(BaseModel):
     
     def _validate(self):
         """Validate item business rules."""
-        # Code validation
-        if not self.item_code or not self.item_code.strip():
-            raise ValueError("Item code cannot be empty")
-        
-        if len(self.item_code) > 50:
-            raise ValueError("Item code cannot exceed 50 characters")
-        
         # Name validation
         if not self.item_name or not self.item_name.strip():
             raise ValueError("Item name cannot be empty")
         
         if len(self.item_name) > 200:
             raise ValueError("Item name cannot exceed 200 characters")
-        
-        # Type validation
-        if self.item_type not in [it.value for it in ItemType]:
-            raise ValueError(f"Invalid item type: {self.item_type}")
         
         # Status validation
         if self.item_status not in [status.value for status in ItemStatus]:
@@ -217,30 +189,14 @@ class Item(BaseModel):
             except ValueError:
                 raise ValueError("Maximum rental days must be a valid number")
     
-    @validates('item_type')
-    def validate_item_type_pricing(self, key, value):
-        """Validate that required pricing is present based on item type."""
-        if value == ItemType.RENTAL.value and not self.rental_price_per_day:
-            raise ValueError("Rental items must have rental_price_per_day")
-        elif value == ItemType.SALE.value and not self.sale_price:
-            raise ValueError("Sale items must have sale_price")
-        elif value == ItemType.BOTH.value and (not self.rental_price_per_day or not self.sale_price):
-            raise ValueError("Items with type BOTH must have both rental_price_per_day and sale_price")
-        return value
     
     def is_rental_item(self) -> bool:
         """Check if item is available for rental."""
-        # Prioritize new boolean field if available, fallback to item_type for backward compatibility
-        if hasattr(self, 'is_rentable'):
-            return self.is_rentable
-        return self.item_type in [ItemType.RENTAL.value, ItemType.BOTH.value]
+        return self.is_rentable
     
     def is_sale_item(self) -> bool:
         """Check if item is available for sale."""
-        # Prioritize new boolean field if available, fallback to item_type for backward compatibility
-        if hasattr(self, 'is_saleable'):
-            return self.is_saleable
-        return self.item_type in [ItemType.SALE.value, ItemType.BOTH.value]
+        return self.is_saleable
     
     def is_item_active(self) -> bool:
         """Check if item is active."""
@@ -261,7 +217,7 @@ class Item(BaseModel):
     @property
     def display_name(self) -> str:
         """Get item display name."""
-        return f"{self.item_name} ({self.item_code})"
+        return f"{self.item_name} ({self.sku})"
     
     @property
     def total_inventory_units(self) -> int:
@@ -291,7 +247,7 @@ class Item(BaseModel):
     def __repr__(self) -> str:
         """Developer representation of item."""
         return (
-            f"Item(id={self.id}, code='{self.item_code}', "
-            f"name='{self.item_name}', type='{self.item_type}', "
-            f"status='{self.item_status}', active={self.is_active})"
+            f"Item(id={self.id}, sku='{self.sku}', "
+            f"name='{self.item_name}', status='{self.item_status}', "
+            f"rentable={self.is_rentable}, saleable={self.is_saleable}, active={self.is_active})"
         )

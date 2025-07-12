@@ -7,7 +7,7 @@ from uuid import UUID
 from app.db.base import BaseModel, UUIDType
 
 if TYPE_CHECKING:
-    from app.modules.inventory.models import Item
+    from app.modules.master_data.item_master.models import Item
 
 
 class Category(BaseModel):
@@ -40,7 +40,7 @@ class Category(BaseModel):
     # children = relationship("Category", back_populates="parent", cascade="all, delete-orphan")
     
     # Items in this category
-    # items = relationship("Item", back_populates="category", lazy="select")  # Temporarily disabled
+    items = relationship("Item", back_populates="category", lazy="select")
     
     # Indexes for efficient queries
     __table_args__ = (

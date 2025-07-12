@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.dependencies import get_session
 from app.modules.master_data.item_master.service import ItemMasterService
-from app.modules.master_data.item_master.models import ItemType, ItemStatus
+from app.modules.master_data.item_master.models import ItemStatus
 from app.modules.master_data.item_master.schemas import (
     ItemCreate, ItemUpdate, ItemResponse, ItemListResponse, ItemWithInventoryResponse,
     SKUGenerationRequest, SKUGenerationResponse, SKUBulkGenerationResponse
@@ -50,16 +50,6 @@ async def get_item(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
-@router.get("/code/{item_code}", response_model=ItemResponse)
-async def get_item_by_code(
-    item_code: str,
-    service: ItemMasterService = Depends(get_item_master_service)
-):
-    """Get item by code."""
-    try:
-        return await service.get_item_by_code(item_code)
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.get("/sku/{sku}", response_model=ItemResponse)
@@ -84,7 +74,6 @@ async def get_items(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of items to return"),
     search: Optional[str] = Query(None, description="Search term for item name, code, or SKU"),
-    item_type: Optional[ItemType] = Query(None, description="Filter by item type"),
     item_status: Optional[ItemStatus] = Query(None, description="Filter by item status"),
     brand_id: Optional[UUID] = Query(None, description="Filter by brand ID"),
     category_id: Optional[UUID] = Query(None, description="Filter by category ID"),
@@ -98,7 +87,6 @@ async def get_items(
         skip=skip,
         limit=limit,
         search=search,
-        item_type=item_type,
         item_status=item_status,
         brand_id=brand_id,
         category_id=category_id,
@@ -223,7 +211,6 @@ async def bulk_generate_skus(
 @router.get("/count/total")
 async def count_items(
     search: Optional[str] = Query(None, description="Search term for item name, code, or SKU"),
-    item_type: Optional[ItemType] = Query(None, description="Filter by item type"),
     item_status: Optional[ItemStatus] = Query(None, description="Filter by item status"),
     brand_id: Optional[UUID] = Query(None, description="Filter by brand ID"),
     category_id: Optional[UUID] = Query(None, description="Filter by category ID"),
@@ -235,7 +222,6 @@ async def count_items(
     """Count items with optional search and filtering."""
     count = await service.count_items(
         search=search,
-        item_type=item_type,
         item_status=item_status,
         brand_id=brand_id,
         category_id=category_id,

@@ -8,7 +8,7 @@ from uuid import uuid4
 from decimal import Decimal
 
 from app.modules.master_data.item_master.schemas import ItemCreate, ItemUpdate, ItemResponse
-from app.modules.master_data.item_master.models import ItemType, ItemStatus
+from app.modules.master_data.item_master.models import ItemStatus
 
 
 async def test_boolean_field_validation():
@@ -29,9 +29,7 @@ async def test_boolean_field_validation():
     for combo in valid_combinations:
         try:
             item_data = {
-                'item_code': f'TEST{combo["is_rentable"]}{combo["is_saleable"]}',
                 'item_name': f'Test Item - {combo["description"]}',
-                'item_type': ItemType.RENTAL,
                 'unit_of_measurement_id': test_uom_id,
                 'is_rentable': combo["is_rentable"],
                 'is_saleable': combo["is_saleable"],
@@ -54,9 +52,7 @@ async def test_boolean_field_validation():
     for combo in invalid_combinations:
         try:
             item_data = {
-                'item_code': f'INVALID{combo["is_rentable"]}{combo["is_saleable"]}',
                 'item_name': f'Invalid Item - {combo["description"]}',
-                'item_type': ItemType.RENTAL,
                 'unit_of_measurement_id': test_uom_id,
                 'is_rentable': combo["is_rentable"],
                 'is_saleable': combo["is_saleable"],
@@ -72,9 +68,7 @@ async def test_boolean_field_validation():
     
     try:
         default_item_data = {
-            'item_code': 'DEFAULT001',
             'item_name': 'Default Test Item',
-            'item_type': ItemType.RENTAL,
             'unit_of_measurement_id': test_uom_id,
             'rental_price_per_day': 25.00
             # Not specifying is_rentable or is_saleable to test defaults
@@ -153,9 +147,7 @@ async def test_boolean_field_validation():
     for test in pricing_tests:
         try:
             item_data = {
-                'item_code': f'PRICE{test["is_rentable"]}{test["is_saleable"]}',
                 'item_name': f'Pricing Test - {test["description"]}',
-                'item_type': ItemType.RENTAL,
                 'unit_of_measurement_id': test_uom_id,
                 'is_rentable': test['is_rentable'],
                 'is_saleable': test['is_saleable'],
@@ -198,7 +190,7 @@ def test_business_logic():
     print("✅ Required Choice: Items must be either rentable OR saleable")
     print("✅ Default Behavior: New items default to rentable=True, saleable=False")
     print("✅ Pricing Rules: Rentable items need rental pricing, saleable items need sale pricing")
-    print("✅ Backward Compatibility: item_type field still works alongside new boolean fields")
+    print("✅ Clean Implementation: Only boolean fields control item behavior")
 
 
 async def main():

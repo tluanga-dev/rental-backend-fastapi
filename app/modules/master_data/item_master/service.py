@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError, ValidationError, ConflictError
-from app.modules.master_data.item_master.models import Item, ItemType, ItemStatus
+from app.modules.master_data.item_master.models import Item, ItemStatus
 from app.modules.master_data.item_master.repository import ItemMasterRepository
 from app.modules.master_data.item_master.schemas import (
     ItemCreate, ItemUpdate, ItemResponse, ItemListResponse, ItemWithInventoryResponse,
@@ -23,16 +23,12 @@ class ItemMasterService:
     # Item operations
     async def create_item(self, item_data: ItemCreate) -> ItemResponse:
         """Create a new item with automatic SKU generation."""
-        # Check if item code already exists
-        existing_item = await self.item_repository.get_by_code(item_data.item_code)
-        if existing_item:
-            raise ConflictError(f"Item with code '{item_data.item_code}' already exists")
-        
         # Generate SKU automatically using new format
         sku = await self.sku_generator.generate_sku(
             category_id=item_data.category_id,
             item_name=item_data.item_name,
-            item_type=item_data.item_type.value
+            is_rentable=item_data.is_rentable,
+            is_saleable=item_data.is_saleable
         )
         
         # Validate item type and pricing
@@ -50,13 +46,6 @@ class ItemMasterService:
         
         return ItemResponse.model_validate(item)
     
-    async def get_item_by_code(self, item_code: str) -> ItemResponse:
-        """Get item by code."""
-        item = await self.item_repository.get_by_code(item_code)
-        if not item:
-            raise NotFoundError(f"Item with code '{item_code}' not found")
-        
-        return ItemResponse.model_validate(item)
     
     async def get_item_by_sku(self, sku: str) -> ItemResponse:
         """Get item by SKU."""
@@ -70,7 +59,6 @@ class ItemMasterService:
         skip: int = 0, 
         limit: int = 100,
         search: Optional[str] = None,
-        item_type: Optional[ItemType] = None,
         item_status: Optional[ItemStatus] = None,
         brand_id: Optional[UUID] = None,
         category_id: Optional[UUID] = None,
@@ -83,7 +71,6 @@ class ItemMasterService:
             skip=skip,
             limit=limit,
             search=search,
-            item_type=item_type,
             item_status=item_status,
             brand_id=brand_id,
             category_id=category_id,
@@ -97,7 +84,6 @@ class ItemMasterService:
     async def count_items(
         self,
         search: Optional[str] = None,
-        item_type: Optional[ItemType] = None,
         item_status: Optional[ItemStatus] = None,
         brand_id: Optional[UUID] = None,
         category_id: Optional[UUID] = None,
@@ -108,7 +94,6 @@ class ItemMasterService:
         """Count all items with optional search and filtering."""
         return await self.item_repository.count_all(
             search=search,
-            item_type=item_type,
             item_status=item_status,
             brand_id=brand_id,
             category_id=category_id,
@@ -141,8 +126,10 @@ class ItemMasterService:
         if not existing_item:
             raise NotFoundError(f"Item with ID {item_id} not found")
         
-        # Validate pricing if type or pricing is being updated
-        if item_data.item_type or any([
+        # Validate pricing if boolean fields or pricing is being updated
+        if any([
+            item_data.is_rentable is not None,
+            item_data.is_saleable is not None,
             item_data.rental_price_per_day is not None,
             item_data.sale_price is not None
         ]):
@@ -193,7 +180,8 @@ class ItemMasterService:
         sku = await self.sku_generator.preview_sku(
             category_id=request.category_id,
             item_name=request.item_name,
-            item_type=request.item_type
+            is_rentable=request.is_rentable,
+            is_saleable=request.is_saleable
         )
         
         # Extract components for response

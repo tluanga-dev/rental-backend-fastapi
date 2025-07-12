@@ -26,7 +26,7 @@ class Brand(BaseModel, NamedModelMixin, CodedModelMixin):
     code = Column(String(20), nullable=True, unique=True, index=True, comment="Unique brand code")
     
     # Relationships
-    # items = relationship("Item", back_populates="brand", lazy="select")  # Commented out - Item model not imported
+    items = relationship("Item", back_populates="brand", lazy="select")
     
     # Additional indexes for performance
     __table_args__ = (

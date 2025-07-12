@@ -4,16 +4,14 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, ConfigDict, field_validator, computed_field, model_validator
 from uuid import UUID
 
-from app.modules.master_data.item_master.models import ItemType, ItemStatus
+from app.modules.master_data.item_master.models import ItemStatus
 
 
 class ItemCreate(BaseModel):
     """Schema for creating a new item."""
     model_config = ConfigDict(protected_namespaces=())
     
-    item_code: str = Field(..., max_length=50, description="Unique item code")
     item_name: str = Field(..., max_length=200, description="Item name")
-    item_type: ItemType = Field(..., description="Item type")
     item_status: ItemStatus = Field(default=ItemStatus.ACTIVE, description="Item status")
     brand_id: Optional[UUID] = Field(None, description="Brand ID")
     category_id: Optional[UUID] = Field(None, description="Category ID")
@@ -78,7 +76,6 @@ class ItemUpdate(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
     
     item_name: Optional[str] = Field(None, max_length=200, description="Item name")
-    item_type: Optional[ItemType] = Field(None, description="Item type")
     item_status: Optional[ItemStatus] = Field(None, description="Item status")
     brand_id: Optional[UUID] = Field(None, description="Brand ID")
     category_id: Optional[UUID] = Field(None, description="Category ID")
@@ -126,10 +123,8 @@ class ItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
     
     id: UUID
-    item_code: str
     sku: str
     item_name: str
-    item_type: ItemType
     item_status: ItemStatus
     brand_id: Optional[UUID]
     category_id: Optional[UUID]
@@ -157,7 +152,7 @@ class ItemResponse(BaseModel):
     @computed_field
     @property
     def display_name(self) -> str:
-        return f"{self.item_name} ({self.item_code})"
+        return f"{self.item_name} ({self.sku})"
     
     @computed_field
     @property
@@ -175,9 +170,8 @@ class ItemListResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     id: UUID
-    item_code: str
+    sku: str
     item_name: str
-    item_type: ItemType
     item_status: ItemStatus
     rental_price_per_day: Optional[Decimal]
     sale_price: Optional[Decimal]
@@ -190,7 +184,7 @@ class ItemListResponse(BaseModel):
     @computed_field
     @property
     def display_name(self) -> str:
-        return f"{self.item_name} ({self.item_code})"
+        return f"{self.item_name} ({self.sku})"
 
 
 class ItemWithInventoryResponse(BaseModel):
@@ -198,10 +192,8 @@ class ItemWithInventoryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
     
     id: UUID
-    item_code: str
     sku: str
     item_name: str
-    item_type: ItemType
     item_status: ItemStatus
     brand_id: Optional[UUID]
     category_id: Optional[UUID]
@@ -234,7 +226,7 @@ class ItemWithInventoryResponse(BaseModel):
     @computed_field
     @property
     def display_name(self) -> str:
-        return f"{self.item_name} ({self.item_code})"
+        return f"{self.item_name} ({self.sku})"
     
     @computed_field
     @property
@@ -253,7 +245,8 @@ class SKUGenerationRequest(BaseModel):
     
     category_id: Optional[UUID] = Field(None, description="Category ID for SKU generation")
     item_name: str = Field(..., description="Item name for product code generation")
-    item_type: str = Field(default="RENTAL", description="Item type (RENTAL, SALE, BOTH)")
+    is_rentable: bool = Field(default=True, description="Item can be rented")
+    is_saleable: bool = Field(default=False, description="Item can be sold")
 
 
 class SKUGenerationResponse(BaseModel):

@@ -5,15 +5,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.dependencies import get_session
 from app.modules.inventory.service import InventoryService
-from app.modules.inventory.models import ItemType, ItemStatus, InventoryUnitStatus, InventoryUnitCondition
+from app.modules.master_data.item_master.models import ItemStatus
+from app.modules.inventory.models import InventoryUnitStatus, InventoryUnitCondition
+from app.modules.master_data.item_master.schemas import (
+    ItemCreate, ItemUpdate, ItemResponse, ItemListResponse, ItemWithInventoryResponse,
+    SKUGenerationRequest, SKUGenerationResponse, SKUBulkGenerationResponse
+)
 from app.modules.inventory.schemas import (
-    ItemCreate, ItemUpdate, ItemResponse, ItemListResponse,
     InventoryUnitCreate, InventoryUnitUpdate, InventoryUnitResponse, InventoryUnitListResponse,
     InventoryUnitStatusUpdate,
     StockLevelCreate, StockLevelUpdate, StockLevelResponse, StockLevelListResponse,
     StockAdjustment, StockReservation, StockReservationRelease,
-    InventoryReport, ItemWithInventoryResponse,
-    SKUGenerationRequest, SKUGenerationResponse, SKUBulkGenerationResponse
+    InventoryReport
 )
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 
@@ -69,7 +72,6 @@ async def get_item_by_code(
 async def get_items(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    item_type: Optional[ItemType] = None,
     item_status: Optional[ItemStatus] = None,
     brand_id: Optional[UUID] = None,
     category_id: Optional[UUID] = None,

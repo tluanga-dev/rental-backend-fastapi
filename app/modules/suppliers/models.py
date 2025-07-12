@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Optional
 from sqlalchemy import Column, String, Text, Boolean, DateTime, Numeric, Integer, Index
+from sqlalchemy.orm import relationship
 from decimal import Decimal
 from datetime import datetime
 
@@ -133,6 +134,9 @@ class Supplier(BaseModel):
     preferred_payment_method = Column(String(50), nullable=True, comment="Preferred payment method")
     insurance_expiry = Column(DateTime, nullable=True, comment="Insurance expiry date")
     certifications = Column(Text, nullable=True, comment="Certifications held")
+    
+    # Relationships
+    items = relationship("Item", back_populates="supplier", lazy="select")
     
     # Indexes for efficient queries
     __table_args__ = (

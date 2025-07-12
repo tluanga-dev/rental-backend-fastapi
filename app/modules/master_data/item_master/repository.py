@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import and_, or_, func, select, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.master_data.item_master.models import Item, ItemType, ItemStatus
+from app.modules.master_data.item_master.models import Item, ItemStatus
 from app.modules.master_data.item_master.schemas import ItemCreate, ItemUpdate
 
 
@@ -16,10 +16,8 @@ class ItemMasterRepository:
     async def create(self, item_data: ItemCreate, sku: str) -> Item:
         """Create a new item with SKU."""
         item = Item(
-            item_code=item_data.item_code,
             sku=sku,
             item_name=item_data.item_name,
-            item_type=item_data.item_type,
             item_status=item_data.item_status,
             is_rentable=item_data.is_rentable,
             is_saleable=item_data.is_saleable
@@ -72,11 +70,6 @@ class ItemMasterRepository:
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
-    async def get_by_code(self, item_code: str) -> Optional[Item]:
-        """Get item by code."""
-        query = select(Item).where(Item.item_code == item_code)
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none()
     
     async def get_by_sku(self, sku: str) -> Optional[Item]:
         """Get item by SKU."""
@@ -100,7 +93,6 @@ class ItemMasterRepository:
         skip: int = 0, 
         limit: int = 100,
         search: Optional[str] = None,
-        item_type: Optional[ItemType] = None,
         item_status: Optional[ItemStatus] = None,
         brand_id: Optional[UUID] = None,
         category_id: Optional[UUID] = None,
@@ -115,8 +107,6 @@ class ItemMasterRepository:
         conditions = []
         if active_only:
             conditions.append(Item.is_active == True)
-        if item_type:
-            conditions.append(Item.item_type == item_type.value)
         if item_status:
             conditions.append(Item.item_status == item_status.value)
         if brand_id:
@@ -132,7 +122,6 @@ class ItemMasterRepository:
         if search:
             search_condition = or_(
                 Item.item_name.ilike(f"%{search}%"),
-                Item.item_code.ilike(f"%{search}%"),
                 Item.sku.ilike(f"%{search}%"),
                 Item.description.ilike(f"%{search}%")
             )
@@ -149,7 +138,6 @@ class ItemMasterRepository:
     async def count_all(
         self,
         search: Optional[str] = None,
-        item_type: Optional[ItemType] = None,
         item_status: Optional[ItemStatus] = None,
         brand_id: Optional[UUID] = None,
         category_id: Optional[UUID] = None,
@@ -164,8 +152,6 @@ class ItemMasterRepository:
         conditions = []
         if active_only:
             conditions.append(Item.is_active == True)
-        if item_type:
-            conditions.append(Item.item_type == item_type.value)
         if item_status:
             conditions.append(Item.item_status == item_status.value)
         if brand_id:
@@ -181,7 +167,6 @@ class ItemMasterRepository:
         if search:
             search_condition = or_(
                 Item.item_name.ilike(f"%{search}%"),
-                Item.item_code.ilike(f"%{search}%"),
                 Item.sku.ilike(f"%{search}%"),
                 Item.description.ilike(f"%{search}%")
             )
@@ -204,7 +189,7 @@ class ItemMasterRepository:
         query = select(Item).where(
             or_(
                 Item.item_name.ilike(f"%{search_term}%"),
-                Item.item_code.ilike(f"%{search_term}%"),
+                Item.sku.ilike(f"%{search_term}%"),
                 Item.description.ilike(f"%{search_term}%")
             )
         )

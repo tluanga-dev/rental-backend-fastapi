@@ -6,13 +6,13 @@ from sqlalchemy import and_, or_, func, select, update, delete, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 
+from app.modules.master_data.item_master.models import Item, ItemStatus
 from app.modules.inventory.models import (
-    Item, InventoryUnit, StockLevel, 
-    ItemType, ItemStatus, InventoryUnitStatus, InventoryUnitCondition
+    InventoryUnit, StockLevel, InventoryUnitStatus, InventoryUnitCondition
 )
+from app.modules.master_data.item_master.schemas import ItemCreate, ItemUpdate
 from app.modules.inventory.schemas import (
-    ItemCreate, ItemUpdate, InventoryUnitCreate, InventoryUnitUpdate,
-    StockLevelCreate, StockLevelUpdate
+    InventoryUnitCreate, InventoryUnitUpdate, StockLevelCreate, StockLevelUpdate
 )
 
 
@@ -25,12 +25,11 @@ class ItemRepository:
     async def create(self, item_data: ItemCreate, sku: str) -> Item:
         """Create a new item with SKU."""
         item = Item(
-            item_code=item_data.item_code,
             sku=sku,
             item_name=item_data.item_name,
-            item_type=item_data.item_type,
-            purchase_price=item_data.purchase_price,
-            item_status=item_data.item_status
+            item_status=item_data.item_status,
+            is_rentable=item_data.is_rentable,
+            is_saleable=item_data.is_saleable
         )
         
         # Set optional fields
@@ -82,11 +81,6 @@ class ItemRepository:
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
-    async def get_by_code(self, item_code: str) -> Optional[Item]:
-        """Get item by code."""
-        query = select(Item).where(Item.item_code == item_code)
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none()
     
     async def get_by_sku(self, sku: str) -> Optional[Item]:
         """Get item by SKU."""
@@ -109,7 +103,6 @@ class ItemRepository:
         self, 
         skip: int = 0, 
         limit: int = 100,
-        item_type: Optional[ItemType] = None,
         item_status: Optional[ItemStatus] = None,
         brand_id: Optional[UUID] = None,
         category_id: Optional[UUID] = None,
@@ -122,8 +115,6 @@ class ItemRepository:
         conditions = []
         if active_only:
             conditions.append(Item.is_active == True)
-        if item_type:
-            conditions.append(Item.item_type == item_type.value)
         if item_status:
             conditions.append(Item.item_status == item_status.value)
         if brand_id:
@@ -141,7 +132,6 @@ class ItemRepository:
     
     async def count_all(
         self,
-        item_type: Optional[ItemType] = None,
         item_status: Optional[ItemStatus] = None,
         brand_id: Optional[UUID] = None,
         category_id: Optional[UUID] = None,
@@ -154,8 +144,6 @@ class ItemRepository:
         conditions = []
         if active_only:
             conditions.append(Item.is_active == True)
-        if item_type:
-            conditions.append(Item.item_type == item_type.value)
         if item_status:
             conditions.append(Item.item_status == item_status.value)
         if brand_id:
@@ -180,7 +168,7 @@ class ItemRepository:
         query = select(Item).where(
             or_(
                 Item.item_name.ilike(f"%{search_term}%"),
-                Item.item_code.ilike(f"%{search_term}%"),
+                Item.sku.ilike(f"%{search_term}%"),
                 Item.description.ilike(f"%{search_term}%")
             )
         )
@@ -226,9 +214,7 @@ class ItemRepository:
     
     async def get_rental_items(self, active_only: bool = True) -> List[Item]:
         """Get all rental items."""
-        query = select(Item).where(
-            Item.item_type.in_([ItemType.RENTAL.value, ItemType.BOTH.value])
-        )
+        query = select(Item).where(Item.is_rentable == True)
         
         if active_only:
             query = query.where(Item.is_active == True)
@@ -240,9 +226,7 @@ class ItemRepository:
     
     async def get_sale_items(self, active_only: bool = True) -> List[Item]:
         """Get all sale items."""
-        query = select(Item).where(
-            Item.item_type.in_([ItemType.SALE.value, ItemType.BOTH.value])
-        )
+        query = select(Item).where(Item.is_saleable == True)
         
         if active_only:
             query = query.where(Item.is_active == True)

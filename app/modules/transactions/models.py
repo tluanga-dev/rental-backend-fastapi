@@ -12,7 +12,8 @@ if TYPE_CHECKING:
     from app.modules.customers.models import Customer
     from app.modules.master_data.locations.models import Location
     # from app.modules.auth.models import User  # Temporarily disabled
-    from app.modules.inventory.models import Item, InventoryUnit
+    from app.modules.master_data.item_master.models import Item
+    from app.modules.inventory.models import InventoryUnit
 
 
 class TransactionType(str, Enum):
@@ -556,7 +557,7 @@ class TransactionLine(BaseModel):
     
     # Relationships
     transaction = relationship("TransactionHeader", back_populates="transaction_lines", lazy="select")
-    # item = relationship("Item", back_populates="transaction_lines", lazy="select")  # Temporarily disabled
+    item = relationship("Item", back_populates="transaction_lines", lazy="select")
     # inventory_unit = relationship("InventoryUnit", back_populates="transaction_lines", lazy="select")  # Temporarily disabled
     
     # Indexes for efficient queries

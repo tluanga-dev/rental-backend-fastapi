@@ -36,7 +36,8 @@ class SKUGenerator:
         self,
         category_id: Optional[UUID] = None,
         item_name: str = "",
-        item_type: str = "RENTAL"
+        is_rentable: bool = True,
+        is_saleable: bool = False
     ) -> str:
         """
         Generate a unique SKU for an item.
@@ -44,7 +45,8 @@ class SKUGenerator:
         Args:
             category_id: Category UUID for the item
             item_name: Name of the item for product abbreviation
-            item_type: Type of item (RENTAL, SALE, BOTH)
+            is_rentable: Whether item can be rented
+            is_saleable: Whether item can be sold
             
         Returns:
             Generated unique SKU string in format: CATEGORY-SUBCATEGORY-PRODUCT-ATTRIBUTES-SEQUENCE
@@ -58,8 +60,8 @@ class SKUGenerator:
         # Generate product name abbreviation (first 4 letters)
         product_code = self._get_product_code(item_name)
         
-        # Generate attributes code from item type
-        attributes_code = self._get_attributes_code(item_type)
+        # Generate attributes code from boolean fields
+        attributes_code = self._get_attributes_code_from_booleans(is_rentable, is_saleable)
         
         # Create composite key for sequence tracking
         sku_key = f"{category_code}-{subcategory_code}-{product_code}-{attributes_code}"
@@ -79,7 +81,8 @@ class SKUGenerator:
         self,
         category_id: Optional[UUID] = None,
         item_name: str = "",
-        item_type: str = "RENTAL"
+        is_rentable: bool = True,
+        is_saleable: bool = False
     ) -> str:
         """
         Preview what SKU would be generated without actually generating it.
@@ -87,7 +90,8 @@ class SKUGenerator:
         Args:
             category_id: Category UUID for the item
             item_name: Name of the item for product abbreviation
-            item_type: Type of item (RENTAL, SALE, BOTH)
+            is_rentable: Whether item can be rented
+            is_saleable: Whether item can be sold
             
         Returns:
             Preview SKU string
@@ -98,8 +102,8 @@ class SKUGenerator:
         # Generate product name abbreviation (first 4 letters)
         product_code = self._get_product_code(item_name)
         
-        # Generate attributes code from item type
-        attributes_code = self._get_attributes_code(item_type)
+        # Generate attributes code from boolean fields
+        attributes_code = self._get_attributes_code_from_booleans(is_rentable, is_saleable)
         
         # Create composite key for sequence tracking
         sku_key = f"{category_code}-{subcategory_code}-{product_code}-{attributes_code}"
@@ -173,22 +177,24 @@ class SKUGenerator:
         else:
             return "PROD"
     
-    def _get_attributes_code(self, item_type: str) -> str:
+    def _get_attributes_code_from_booleans(self, is_rentable: bool, is_saleable: bool) -> str:
         """
-        Generate attributes code from item type.
+        Generate attributes code from boolean fields.
         
         Args:
-            item_type: Type of item (RENTAL, SALE, BOTH)
+            is_rentable: Whether item can be rented
+            is_saleable: Whether item can be sold
             
         Returns:
             1-character attributes code
         """
-        type_mapping = {
-            "RENTAL": "R",
-            "SALE": "S", 
-            "BOTH": "B"
-        }
-        return type_mapping.get(item_type.upper(), "R")
+        if is_rentable and not is_saleable:
+            return "R"
+        elif is_saleable and not is_rentable:
+            return "S"
+        else:
+            # This shouldn't happen due to validation, but default to R
+            return "R"
     
     def _generate_code_from_name(self, name: str, max_length: int = 8) -> str:
         """
@@ -362,11 +368,12 @@ class SKUGenerator:
         
         for item in items_without_skus:
             try:
-                # Generate SKU based on item's category, name, and type
+                # Generate SKU based on item's category, name, and boolean fields
                 sku = await self.generate_sku(
                     category_id=item.category_id,
                     item_name=item.item_name,
-                    item_type=item.item_type
+                    is_rentable=item.is_rentable,
+                    is_saleable=item.is_saleable
                 )
                 
                 # Update item with generated SKU
@@ -377,7 +384,7 @@ class SKUGenerator:
                 failed += 1
                 errors.append({
                     "item_id": str(item.id),
-                    "item_code": item.item_code,
+                    "sku": item.sku,
                     "error": str(e)
                 })
         
