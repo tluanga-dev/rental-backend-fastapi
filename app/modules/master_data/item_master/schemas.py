@@ -167,6 +167,9 @@ class ItemListResponse(BaseModel):
     sku: str
     item_name: str
     item_status: ItemStatus
+    brand_id: Optional[UUID]
+    category_id: Optional[UUID]
+    unit_of_measurement_id: Optional[UUID]
     rental_rate_per_period: Optional[Decimal]
     sale_price: Optional[Decimal]
     purchase_price: Optional[Decimal]
