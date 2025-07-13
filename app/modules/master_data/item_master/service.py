@@ -1,5 +1,6 @@
 from typing import Optional, List
 from uuid import UUID
+from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 import time
 import logging
@@ -9,7 +10,9 @@ from app.modules.master_data.item_master.models import Item, ItemStatus
 from app.modules.master_data.item_master.repository import ItemMasterRepository
 from app.modules.master_data.item_master.schemas import (
     ItemCreate, ItemUpdate, ItemResponse, ItemListResponse, ItemWithInventoryResponse,
-    SKUGenerationRequest, SKUGenerationResponse, SKUBulkGenerationResponse
+    ItemWithRelationsResponse, ItemListWithRelationsResponse, ItemNestedResponse,
+    SKUGenerationRequest, SKUGenerationResponse, SKUBulkGenerationResponse,
+    BrandNested, CategoryNested, UnitOfMeasurementNested
 )
 from app.shared.utils.sku_generator import SKUGenerator
 
@@ -148,6 +151,66 @@ class ItemMasterService:
         
         return [ItemListResponse.model_validate(item) for item in items]
     
+    async def get_items_with_relations(
+        self, 
+        skip: int = 0, 
+        limit: int = 100,
+        item_status: Optional[ItemStatus] = None,
+        brand_ids: Optional[List[UUID]] = None,
+        category_ids: Optional[List[UUID]] = None,
+        active_only: bool = True,
+        # Additional filters
+        is_rentable: Optional[bool] = None,
+        is_saleable: Optional[bool] = None,
+        min_rental_rate: Optional[float] = None,
+        max_rental_rate: Optional[float] = None,
+        min_sale_price: Optional[float] = None,
+        max_sale_price: Optional[float] = None,
+        has_stock: Optional[bool] = None,
+        search_term: Optional[str] = None,
+        # Date filters
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+        updated_after: Optional[str] = None,
+        updated_before: Optional[str] = None
+    ) -> List[ItemListWithRelationsResponse]:
+        """Get all items with relationship data and enhanced filtering."""
+        from decimal import Decimal
+        
+        # Convert float parameters to Decimal for repository
+        min_rental_rate_decimal = Decimal(str(min_rental_rate)) if min_rental_rate else None
+        max_rental_rate_decimal = Decimal(str(max_rental_rate)) if max_rental_rate else None
+        min_sale_price_decimal = Decimal(str(min_sale_price)) if min_sale_price else None
+        max_sale_price_decimal = Decimal(str(max_sale_price)) if max_sale_price else None
+        
+        items_data = await self.item_repository.get_all_with_relations(
+            skip=skip,
+            limit=limit,
+            item_status=item_status,
+            brand_ids=brand_ids,
+            category_ids=category_ids,
+            active_only=active_only,
+            is_rentable=is_rentable,
+            is_saleable=is_saleable,
+            min_rental_rate=min_rental_rate_decimal,
+            max_rental_rate=max_rental_rate_decimal,
+            min_sale_price=min_sale_price_decimal,
+            max_sale_price=max_sale_price_decimal,
+            has_stock=has_stock,
+            search_term=search_term,
+            created_after=created_after,
+            created_before=created_before,
+            updated_after=updated_after,
+            updated_before=updated_before
+        )
+        
+        # Convert raw data to Pydantic models
+        response_items = []
+        for item_data in items_data:
+            response_items.append(ItemListWithRelationsResponse(**item_data))
+        
+        return response_items
+    
     async def count_items(
         self,
         search: Optional[str] = None,
@@ -240,6 +303,113 @@ class ItemMasterService:
         """Get items that need reordering based on reorder level."""
         items = await self.item_repository.get_low_stock_items(active_only=active_only)
         return [ItemListResponse.model_validate(item) for item in items]
+    
+    async def get_items_nested_format(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        item_status: Optional[ItemStatus] = None,
+        brand_ids: Optional[List[UUID]] = None,
+        category_ids: Optional[List[UUID]] = None,
+        active_only: bool = True,
+        is_rentable: Optional[bool] = None,
+        is_saleable: Optional[bool] = None,
+        min_rental_rate: Optional[Decimal] = None,
+        max_rental_rate: Optional[Decimal] = None,
+        min_sale_price: Optional[Decimal] = None,
+        max_sale_price: Optional[Decimal] = None,
+        has_stock: Optional[bool] = None,
+        search_term: Optional[str] = None,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+        updated_after: Optional[str] = None,
+        updated_before: Optional[str] = None
+    ) -> List[ItemNestedResponse]:
+        """Get items with nested relationship format."""
+        # Convert decimal price filters if provided
+        if min_rental_rate is not None:
+            min_rental_rate = Decimal(str(min_rental_rate))
+        if max_rental_rate is not None:
+            max_rental_rate = Decimal(str(max_rental_rate))
+        if min_sale_price is not None:
+            min_sale_price = Decimal(str(min_sale_price))
+        if max_sale_price is not None:
+            max_sale_price = Decimal(str(max_sale_price))
+        
+        # Get items with eagerly loaded relationships
+        items = await self.item_repository.get_all_with_nested_relations(
+            skip=skip,
+            limit=limit,
+            item_status=item_status,
+            brand_ids=brand_ids,
+            category_ids=category_ids,
+            active_only=active_only,
+            is_rentable=is_rentable,
+            is_saleable=is_saleable,
+            min_rental_rate=min_rental_rate,
+            max_rental_rate=max_rental_rate,
+            min_sale_price=min_sale_price,
+            max_sale_price=max_sale_price,
+            has_stock=has_stock,
+            search_term=search_term,
+            created_after=created_after,
+            created_before=created_before,
+            updated_after=updated_after,
+            updated_before=updated_before
+        )
+        
+        # Transform to nested format
+        response_items = []
+        for item in items:
+            # Build nested response
+            nested_item = {
+                "item_name": item.item_name,
+                "item_status": item.item_status,
+                "brand_id": None,
+                "category_id": None,
+                "unit_of_measurement_id": None,
+                "rental_rate_per_period": item.rental_rate_per_period or Decimal("0"),
+                "rental_period": item.rental_period or "1",
+                "sale_price": item.sale_price or Decimal("0"),
+                "purchase_price": item.purchase_price or Decimal("0"),
+                "initial_stock_quantity": 0,  # This would need to come from inventory
+                "security_deposit": item.security_deposit or Decimal("0"),
+                "description": item.description,
+                "specifications": item.specifications,
+                "model_number": item.model_number,
+                "serial_number_required": item.serial_number_required,
+                "warranty_period_days": item.warranty_period_days or "0",
+                "reorder_level": item.reorder_level or "0",
+                "reorder_quantity": item.reorder_quantity or "0",
+                "is_rentable": item.is_rentable,
+                "is_saleable": item.is_saleable
+            }
+            
+            # Add nested brand info
+            if item.brand:
+                nested_item["brand_id"] = BrandNested(
+                    id=item.brand.id,
+                    name=item.brand.name
+                )
+            
+            # Add nested category info
+            if item.category:
+                nested_item["category_id"] = CategoryNested(
+                    id=item.category.id,
+                    name=item.category.name
+                )
+            
+            # Add nested unit info (always present as it's required)
+            if item.unit_of_measurement:
+                nested_item["unit_of_measurement_id"] = UnitOfMeasurementNested(
+                    id=item.unit_of_measurement.id,
+                    name=item.unit_of_measurement.name,
+                    code=item.unit_of_measurement.abbreviation
+                )
+            
+            response_items.append(ItemNestedResponse(**nested_item))
+        
+        return response_items
     
     # SKU-specific operations
     async def generate_sku_preview(self, request: SKUGenerationRequest) -> SKUGenerationResponse:

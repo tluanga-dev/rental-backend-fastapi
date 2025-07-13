@@ -1,7 +1,9 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from uuid import UUID
-from sqlalchemy import and_, or_, func, select, asc
+from decimal import Decimal
+from sqlalchemy import and_, or_, func, select, asc, case
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.master_data.item_master.models import Item, ItemStatus
 from app.modules.master_data.item_master.schemas import ItemCreate, ItemUpdate
@@ -63,6 +65,22 @@ class ItemMasterRepository:
     async def get_by_id(self, item_id: UUID) -> Optional[Item]:
         """Get item by ID."""
         query = select(Item).where(Item.id == item_id)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+    
+    async def get_by_id_with_relations(self, item_id: UUID) -> Optional[Item]:
+        """Get item by ID with relationships loaded."""
+        query = (
+            select(Item)
+            .options(
+                selectinload(Item.brand),
+                selectinload(Item.category),
+                selectinload(Item.unit_of_measurement),
+                selectinload(Item.inventory_units),
+                selectinload(Item.stock_levels)
+            )
+            .where(Item.id == item_id)
+        )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
@@ -137,6 +155,185 @@ class ItemMasterRepository:
         
         result = await self.session.execute(query)
         return result.scalars().all()
+    
+    async def get_all_with_relations(
+        self, 
+        skip: int = 0, 
+        limit: int = 100,
+        item_status: Optional[ItemStatus] = None,
+        brand_ids: Optional[List[UUID]] = None,
+        category_ids: Optional[List[UUID]] = None,
+        active_only: bool = True,
+        # Additional filters
+        is_rentable: Optional[bool] = None,
+        is_saleable: Optional[bool] = None,
+        min_rental_rate: Optional[Decimal] = None,
+        max_rental_rate: Optional[Decimal] = None,
+        min_sale_price: Optional[Decimal] = None,
+        max_sale_price: Optional[Decimal] = None,
+        has_stock: Optional[bool] = None,
+        search_term: Optional[str] = None,
+        # Date filters
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+        updated_after: Optional[str] = None,
+        updated_before: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all items with relationship data and inventory aggregation."""
+        from app.modules.master_data.brands.models import Brand
+        from app.modules.master_data.categories.models import Category
+        from app.modules.master_data.units.models import UnitOfMeasurement
+        from app.modules.inventory.models import InventoryUnit, InventoryUnitStatus
+        
+        # Build base query with JOINs for relationship data
+        query = (
+            select(
+                Item,
+                Brand.name.label("brand_name"),
+                Brand.code.label("brand_code"),
+                Brand.description.label("brand_description"),
+                Category.name.label("category_name"),
+                Category.category_path,
+                Category.category_level.label("category_level"),
+                UnitOfMeasurement.name.label("unit_name"),
+                UnitOfMeasurement.abbreviation,
+                func.count(InventoryUnit.id).label("total_units"),
+                func.sum(
+                    case(
+                        (InventoryUnit.status == InventoryUnitStatus.AVAILABLE.value, 1),
+                        else_=0
+                    )
+                ).label("available_units"),
+                func.sum(
+                    case(
+                        (InventoryUnit.status == InventoryUnitStatus.RENTED.value, 1),
+                        else_=0
+                    )
+                ).label("rented_units")
+            )
+            .outerjoin(Brand, Item.brand_id == Brand.id)
+            .outerjoin(Category, Item.category_id == Category.id)
+            .outerjoin(UnitOfMeasurement, Item.unit_of_measurement_id == UnitOfMeasurement.id)
+            .outerjoin(InventoryUnit, Item.id == InventoryUnit.item_id)
+            .group_by(Item.id, Brand.id, Category.id, UnitOfMeasurement.id)
+        )
+        
+        # Apply filters
+        conditions = []
+        if active_only:
+            conditions.append(Item.is_active == True)
+        if item_status:
+            conditions.append(Item.item_status == item_status.value)
+        if brand_ids:
+            conditions.append(Item.brand_id.in_(brand_ids))
+        if category_ids:
+            conditions.append(Item.category_id.in_(category_ids))
+        if is_rentable is not None:
+            conditions.append(Item.is_rentable == is_rentable)
+        if is_saleable is not None:
+            conditions.append(Item.is_saleable == is_saleable)
+        if min_rental_rate:
+            conditions.append(Item.rental_rate_per_period >= min_rental_rate)
+        if max_rental_rate:
+            conditions.append(Item.rental_rate_per_period <= max_rental_rate)
+        if min_sale_price:
+            conditions.append(Item.sale_price >= min_sale_price)
+        if max_sale_price:
+            conditions.append(Item.sale_price <= max_sale_price)
+        
+        # Search functionality enhanced
+        if search_term:
+            search_condition = or_(
+                Item.item_name.ilike(f"%{search_term}%"),
+                Item.sku.ilike(f"%{search_term}%"),
+                Item.description.ilike(f"%{search_term}%"),
+                Item.model_number.ilike(f"%{search_term}%"),
+                Item.specifications.ilike(f"%{search_term}%"),
+                Brand.name.ilike(f"%{search_term}%"),
+                Category.name.ilike(f"%{search_term}%")
+            )
+            conditions.append(search_condition)
+        
+        # Date range filters
+        if created_after:
+            from datetime import datetime
+            created_after_dt = datetime.fromisoformat(created_after.replace('Z', '+00:00'))
+            conditions.append(Item.created_at >= created_after_dt)
+        if created_before:
+            from datetime import datetime
+            created_before_dt = datetime.fromisoformat(created_before.replace('Z', '+00:00'))
+            conditions.append(Item.created_at <= created_before_dt)
+        if updated_after:
+            from datetime import datetime
+            updated_after_dt = datetime.fromisoformat(updated_after.replace('Z', '+00:00'))
+            conditions.append(Item.updated_at >= updated_after_dt)
+        if updated_before:
+            from datetime import datetime
+            updated_before_dt = datetime.fromisoformat(updated_before.replace('Z', '+00:00'))
+            conditions.append(Item.updated_at <= updated_before_dt)
+        
+        if conditions:
+            query = query.where(and_(*conditions))
+        
+        # Apply stock filter after grouping
+        if has_stock is not None:
+            if has_stock:
+                query = query.having(func.count(InventoryUnit.id) > 0)
+            else:
+                query = query.having(func.count(InventoryUnit.id) == 0)
+        
+        query = query.order_by(asc(Item.item_name)).offset(skip).limit(limit)
+        
+        result = await self.session.execute(query)
+        rows = result.all()
+        
+        # Convert to list of dictionaries with all data
+        items_data = []
+        for row in rows:
+            item = row[0]  # Item object
+            item_dict = {
+                # Basic item fields
+                "id": item.id,
+                "sku": item.sku,
+                "item_name": item.item_name,
+                "item_status": item.item_status,
+                "brand_id": item.brand_id,
+                "category_id": item.category_id,
+                "unit_of_measurement_id": item.unit_of_measurement_id,
+                "rental_rate_per_period": item.rental_rate_per_period,
+                "rental_period": item.rental_period,
+                "sale_price": item.sale_price,
+                "purchase_price": item.purchase_price,
+                "security_deposit": item.security_deposit,
+                "description": item.description,
+                "specifications": item.specifications,
+                "model_number": item.model_number,
+                "serial_number_required": item.serial_number_required,
+                "warranty_period_days": item.warranty_period_days,
+                "reorder_level": item.reorder_level,
+                "reorder_quantity": item.reorder_quantity,
+                "is_rentable": item.is_rentable,
+                "is_saleable": item.is_saleable,
+                "is_active": item.is_active,
+                "created_at": item.created_at,
+                "updated_at": item.updated_at,
+                # Relationship data
+                "brand_name": row[1],
+                "brand_code": row[2],
+                "brand_description": row[3],
+                "category_name": row[4],
+                "category_path": row[5],
+                "category_level": row[6],
+                "unit_name": row[7],
+                "unit_abbreviation": row[8],
+                # Inventory summary
+                "total_units": row[9] or 0,
+                "available_units": row[10] or 0,
+                "rented_units": row[11] or 0,
+            }
+            items_data.append(item_dict)
+        
+        return items_data
     
     async def count_all(
         self,
@@ -301,3 +498,107 @@ class ItemMasterRepository:
         
         result = await self.session.execute(query)
         return result.scalars().all()
+    
+    async def get_all_with_nested_relations(
+        self, 
+        skip: int = 0, 
+        limit: int = 100,
+        item_status: Optional[ItemStatus] = None,
+        brand_ids: Optional[List[UUID]] = None,
+        category_ids: Optional[List[UUID]] = None,
+        active_only: bool = True,
+        # Additional filters
+        is_rentable: Optional[bool] = None,
+        is_saleable: Optional[bool] = None,
+        min_rental_rate: Optional[Decimal] = None,
+        max_rental_rate: Optional[Decimal] = None,
+        min_sale_price: Optional[Decimal] = None,
+        max_sale_price: Optional[Decimal] = None,
+        has_stock: Optional[bool] = None,
+        search_term: Optional[str] = None,
+        # Date filters
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+        updated_after: Optional[str] = None,
+        updated_before: Optional[str] = None
+    ) -> List[Item]:
+        """Get all items with eagerly loaded relationships for nested response."""
+        from app.modules.master_data.brands.models import Brand
+        from app.modules.master_data.categories.models import Category
+        from app.modules.master_data.units.models import UnitOfMeasurement
+        
+        # Build query with eager loading
+        query = (
+            select(Item)
+            .options(
+                selectinload(Item.brand),
+                selectinload(Item.category),
+                selectinload(Item.unit_of_measurement)
+            )
+        )
+        
+        # Apply filters
+        conditions = []
+        if active_only:
+            conditions.append(Item.is_active == True)
+        if item_status:
+            conditions.append(Item.item_status == item_status.value)
+        if brand_ids:
+            conditions.append(Item.brand_id.in_(brand_ids))
+        if category_ids:
+            conditions.append(Item.category_id.in_(category_ids))
+        if is_rentable is not None:
+            conditions.append(Item.is_rentable == is_rentable)
+        if is_saleable is not None:
+            conditions.append(Item.is_saleable == is_saleable)
+        if min_rental_rate:
+            conditions.append(Item.rental_rate_per_period >= min_rental_rate)
+        if max_rental_rate:
+            conditions.append(Item.rental_rate_per_period <= max_rental_rate)
+        if min_sale_price:
+            conditions.append(Item.sale_price >= min_sale_price)
+        if max_sale_price:
+            conditions.append(Item.sale_price <= max_sale_price)
+        
+        # Search functionality
+        if search_term:
+            # Need to join for search in related tables
+            query = query.outerjoin(Brand, Item.brand_id == Brand.id)
+            query = query.outerjoin(Category, Item.category_id == Category.id)
+            
+            search_condition = or_(
+                Item.item_name.ilike(f"%{search_term}%"),
+                Item.sku.ilike(f"%{search_term}%"),
+                Item.description.ilike(f"%{search_term}%"),
+                Item.model_number.ilike(f"%{search_term}%"),
+                Item.specifications.ilike(f"%{search_term}%"),
+                Brand.name.ilike(f"%{search_term}%"),
+                Category.name.ilike(f"%{search_term}%")
+            )
+            conditions.append(search_condition)
+        
+        # Date range filters
+        if created_after:
+            from datetime import datetime
+            created_after_dt = datetime.fromisoformat(created_after.replace('Z', '+00:00'))
+            conditions.append(Item.created_at >= created_after_dt)
+        if created_before:
+            from datetime import datetime
+            created_before_dt = datetime.fromisoformat(created_before.replace('Z', '+00:00'))
+            conditions.append(Item.created_at <= created_before_dt)
+        if updated_after:
+            from datetime import datetime
+            updated_after_dt = datetime.fromisoformat(updated_after.replace('Z', '+00:00'))
+            conditions.append(Item.updated_at >= updated_after_dt)
+        if updated_before:
+            from datetime import datetime
+            updated_before_dt = datetime.fromisoformat(updated_before.replace('Z', '+00:00'))
+            conditions.append(Item.updated_at <= updated_before_dt)
+        
+        if conditions:
+            query = query.where(and_(*conditions))
+        
+        query = query.order_by(asc(Item.item_name)).offset(skip).limit(limit)
+        
+        result = await self.session.execute(query)
+        return result.scalars().unique().all()

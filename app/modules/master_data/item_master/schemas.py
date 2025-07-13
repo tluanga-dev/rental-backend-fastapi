@@ -7,6 +7,32 @@ from uuid import UUID
 from app.modules.master_data.item_master.models import ItemStatus
 
 
+# Nested relationship schemas
+class BrandNested(BaseModel):
+    """Nested brand information for item responses."""
+    id: UUID
+    name: str
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CategoryNested(BaseModel):
+    """Nested category information for item responses."""
+    id: UUID
+    name: str
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UnitOfMeasurementNested(BaseModel):
+    """Nested unit of measurement information for item responses."""
+    id: UUID
+    name: str
+    code: Optional[str] = Field(None, description="Unit abbreviation/code")
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ItemCreate(BaseModel):
     """Schema for creating a new item."""
     model_config = ConfigDict(protected_namespaces=())
@@ -235,6 +261,38 @@ class ItemWithInventoryResponse(BaseModel):
         return self.is_saleable
 
 
+# New nested response schema as requested by user
+class ItemNestedResponse(BaseModel):
+    """Schema for item response with nested relationship objects."""
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+    
+    # Basic fields without ID (as per the requested format)
+    item_name: str
+    item_status: ItemStatus
+    
+    # Nested relationship objects
+    brand_id: Optional[BrandNested] = Field(None, description="Brand information")
+    category_id: Optional[CategoryNested] = Field(None, description="Category information")
+    unit_of_measurement_id: UnitOfMeasurementNested = Field(..., description="Unit of measurement information")
+    
+    # Other fields
+    rental_rate_per_period: Optional[Decimal] = Field(default=Decimal("0"))
+    rental_period: str = Field(default="1")
+    sale_price: Optional[Decimal] = Field(default=Decimal("0"))
+    purchase_price: Optional[Decimal] = Field(default=Decimal("0"))
+    initial_stock_quantity: Optional[int] = Field(default=0)
+    security_deposit: Decimal = Field(default=Decimal("0"))
+    description: Optional[str]
+    specifications: Optional[str]
+    model_number: Optional[str]
+    serial_number_required: bool = Field(default=False)
+    warranty_period_days: str = Field(default="0")
+    reorder_level: str = Field(default="0")
+    reorder_quantity: str = Field(default="0")
+    is_rentable: bool = Field(default=True)
+    is_saleable: bool = Field(default=False)
+
+
 # SKU-specific schemas
 class SKUGenerationRequest(BaseModel):
     """Schema for SKU generation request."""
@@ -263,3 +321,160 @@ class SKUBulkGenerationResponse(BaseModel):
     successful_generations: int = Field(..., description="Number of successful generations")
     failed_generations: int = Field(..., description="Number of failed generations")
     errors: List[dict] = Field(default_factory=list, description="Generation errors")
+
+
+# Enhanced response schemas with relationship data
+class BrandInfo(BaseModel):
+    """Brand information for item response."""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: UUID
+    brand_name: str
+    brand_code: Optional[str] = None
+    description: Optional[str] = None
+
+
+class CategoryInfo(BaseModel):
+    """Category information for item response."""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: UUID
+    category_name: str
+    category_path: Optional[str] = None
+    level: Optional[int] = None
+
+
+class UnitInfo(BaseModel):
+    """Unit of measurement information for item response."""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: UUID
+    unit_name: str
+    abbreviation: Optional[str] = None
+    symbol: Optional[str] = None
+
+
+class ItemWithRelationsResponse(BaseModel):
+    """Enhanced schema for item response with relationship data."""
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+    
+    # Basic item fields
+    id: UUID
+    sku: str
+    item_name: str
+    item_status: ItemStatus
+    brand_id: Optional[UUID]
+    category_id: Optional[UUID]
+    unit_of_measurement_id: UUID
+    rental_rate_per_period: Optional[Decimal]
+    rental_period: Optional[str]
+    sale_price: Optional[Decimal]
+    purchase_price: Optional[Decimal]
+    security_deposit: Decimal
+    description: Optional[str]
+    specifications: Optional[str]
+    model_number: Optional[str]
+    serial_number_required: bool
+    warranty_period_days: str
+    reorder_level: str
+    reorder_quantity: str
+    is_rentable: bool
+    is_saleable: bool
+    is_active: Optional[bool] = True
+    created_at: datetime
+    updated_at: datetime
+    
+    # Relationship data
+    brand: Optional[BrandInfo] = None
+    category: Optional[CategoryInfo] = None
+    unit_of_measurement: Optional[UnitInfo] = None
+    
+    # Inventory summary fields
+    total_units: int = Field(default=0, description="Total number of inventory units")
+    available_units: int = Field(default=0, description="Number of available units")
+    rented_units: int = Field(default=0, description="Number of rented units")
+    
+    @computed_field
+    @property
+    def display_name(self) -> str:
+        return f"{self.item_name} ({self.sku})"
+    
+    @computed_field
+    @property
+    def brand_name(self) -> Optional[str]:
+        return self.brand.brand_name if self.brand else None
+    
+    @computed_field
+    @property
+    def brand_code(self) -> Optional[str]:
+        return self.brand.brand_code if self.brand else None
+    
+    @computed_field
+    @property
+    def category_name(self) -> Optional[str]:
+        return self.category.category_name if self.category else None
+    
+    @computed_field
+    @property
+    def category_path(self) -> Optional[str]:
+        return self.category.category_path if self.category else None
+    
+    @computed_field
+    @property
+    def unit_name(self) -> Optional[str]:
+        return self.unit_of_measurement.unit_name if self.unit_of_measurement else None
+    
+    @computed_field
+    @property
+    def unit_abbreviation(self) -> Optional[str]:
+        return self.unit_of_measurement.abbreviation if self.unit_of_measurement else None
+    
+    @computed_field
+    @property
+    def is_rental_item(self) -> bool:
+        return self.is_rentable
+    
+    @computed_field
+    @property
+    def is_sale_item(self) -> bool:
+        return self.is_saleable
+
+
+class ItemListWithRelationsResponse(BaseModel):
+    """Enhanced schema for item list response with relationship data (lightweight)."""
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+    
+    # Basic item fields
+    id: UUID
+    sku: str
+    item_name: str
+    item_status: ItemStatus
+    brand_id: Optional[UUID]
+    category_id: Optional[UUID]
+    unit_of_measurement_id: UUID
+    rental_rate_per_period: Optional[Decimal]
+    sale_price: Optional[Decimal]
+    purchase_price: Optional[Decimal]
+    is_rentable: bool
+    is_saleable: bool
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    
+    # Relationship data (lightweight)
+    brand_name: Optional[str] = None
+    brand_code: Optional[str] = None
+    category_name: Optional[str] = None
+    category_path: Optional[str] = None
+    unit_name: Optional[str] = None
+    unit_abbreviation: Optional[str] = None
+    
+    # Inventory summary fields
+    total_units: int = Field(default=0, description="Total number of inventory units")
+    available_units: int = Field(default=0, description="Number of available units")
+    rented_units: int = Field(default=0, description="Number of rented units")
+    
+    @computed_field
+    @property
+    def display_name(self) -> str:
+        return f"{self.item_name} ({self.sku})"
