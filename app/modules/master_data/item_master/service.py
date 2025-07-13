@@ -8,6 +8,7 @@ import logging
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 from app.modules.master_data.item_master.models import Item, ItemStatus
 from app.modules.master_data.item_master.repository import ItemMasterRepository
+from app.modules.master_data.units.repository import UnitOfMeasurementRepository
 from app.modules.master_data.item_master.schemas import (
     ItemCreate, ItemUpdate, ItemResponse, ItemListResponse, ItemWithInventoryResponse,
     ItemWithRelationsResponse, ItemListWithRelationsResponse, ItemNestedResponse,
@@ -23,6 +24,7 @@ class ItemMasterService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.item_repository = ItemMasterRepository(session)
+        self.unit_repository = UnitOfMeasurementRepository(session)
         self.sku_generator = SKUGenerator(session)
         self.logger = logging.getLogger(__name__)
     
@@ -399,13 +401,28 @@ class ItemMasterService:
                     name=item.category.name
                 )
             
-            # Add nested unit info (always present as it's required)
+            # Add nested unit info (required field)
             if item.unit_of_measurement:
                 nested_item["unit_of_measurement_id"] = UnitOfMeasurementNested(
                     id=item.unit_of_measurement.id,
                     name=item.unit_of_measurement.name,
                     code=item.unit_of_measurement.abbreviation
                 )
+            elif item.unit_of_measurement_id:
+                # Fallback: if relationship not loaded but ID exists, fetch the unit
+                unit = await self.unit_repository.get_by_id(item.unit_of_measurement_id)
+                if unit:
+                    nested_item["unit_of_measurement_id"] = UnitOfMeasurementNested(
+                        id=unit.id,
+                        name=unit.name,
+                        code=unit.abbreviation
+                    )
+                else:
+                    # Data inconsistency: unit ID exists but unit not found
+                    raise ValueError(f"Unit of measurement with ID {item.unit_of_measurement_id} not found for item {item.item_name}")
+            else:
+                # This should not happen if database constraints are correct
+                raise ValueError(f"Item {item.item_name} has no unit of measurement")
             
             response_items.append(ItemNestedResponse(**nested_item))
         
