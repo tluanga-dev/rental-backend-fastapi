@@ -31,6 +31,7 @@ class SKUGenerator:
     def __init__(self, session: AsyncSession):
         """Initialize SKU generator with database session."""
         self.session = session
+        self._category_cache = {}  # Cache for category lookups
     
     async def generate_sku(
         self,
@@ -127,12 +128,19 @@ class SKUGenerator:
         if not category_id:
             return "MISC", "ITEM"
         
+        # Check cache first
+        cache_key = str(category_id)
+        if cache_key in self._category_cache:
+            return self._category_cache[cache_key]
+        
         query = select(Category).where(Category.id == category_id, Category.is_active == True)
         result = await self.session.execute(query)
         category = result.scalar_one_or_none()
         
         if not category:
-            return "MISC", "ITEM"
+            result = "MISC", "ITEM"
+            self._category_cache[cache_key] = result
+            return result
         
         # Parse category path to extract hierarchy
         category_path = category.category_path or category.name
@@ -151,7 +159,10 @@ class SKUGenerator:
             category_code = "MISC"
             subcategory_code = "ITEM"
         
-        return category_code, subcategory_code
+        result = category_code, subcategory_code
+        # Cache the result for future use
+        self._category_cache[cache_key] = result
+        return result
     
     def _get_product_code(self, item_name: str) -> str:
         """
@@ -242,13 +253,17 @@ class SKUGenerator:
         Returns:
             Next sequence number
         """
-        sequence_record = await self._get_sequence_record(sku_key)
+        # Use SELECT FOR UPDATE to prevent race conditions
+        from sqlalchemy import text
+        
+        sequence_record = await self._get_sequence_record_for_update(sku_key)
         
         if sequence_record:
             # Increment existing sequence
             next_seq = sequence_record.get_next_sequence_number()
             sequence_record.increment_sequence()
-            await self.session.commit()
+            # Flush to ensure the update is made but don't commit yet
+            await self.session.flush()
             return next_seq
         else:
             # Create new sequence record using the composite key as brand_code
@@ -258,7 +273,8 @@ class SKUGenerator:
                 next_sequence="2"  # Start at 2 since we're returning 1
             )
             self.session.add(new_sequence)
-            await self.session.commit()
+            # Flush to ensure the insert is made but don't commit yet
+            await self.session.flush()
             return 1
     
     async def _get_sequence_record(self, sku_key: str) -> Optional[SKUSequence]:
@@ -267,6 +283,15 @@ class SKUGenerator:
             SKUSequence.brand_code == sku_key,
             SKUSequence.category_code.is_(None)
         )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+    
+    async def _get_sequence_record_for_update(self, sku_key: str) -> Optional[SKUSequence]:
+        """Get existing sequence record for SKU key with row locking."""
+        query = select(SKUSequence).where(
+            SKUSequence.brand_code == sku_key,
+            SKUSequence.category_code.is_(None)
+        ).with_for_update()
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
@@ -330,7 +355,7 @@ class SKUGenerator:
             ValidationError: If SKU already exists
         """
         # Import here to avoid circular import
-        from app.modules.inventory.models import Item
+        from app.modules.master_data.item_master.models import Item
         
         query = select(Item).where(Item.sku == sku)
         result = await self.session.execute(query)
@@ -347,7 +372,7 @@ class SKUGenerator:
             Dictionary with generation statistics
         """
         # Import here to avoid circular import
-        from app.modules.inventory.models import Item
+        from app.modules.master_data.item_master.models import Item
         
         # Find items without SKUs
         query = select(Item).where(Item.sku.is_(None))

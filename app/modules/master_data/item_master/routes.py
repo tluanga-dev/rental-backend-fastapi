@@ -69,30 +69,39 @@ async def get_item_by_sku(
 
 @router.get("/", response_model=List[ItemListResponse],
            summary="Get Items", 
-           description="Get paginated list of items with advanced search and filtering capabilities")
+           description="Get paginated list of items with essential filtering capabilities")
 async def get_items(
+    # Pagination
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of items to return"),
-    search: Optional[str] = Query(None, description="Search term for item name, code, or SKU"),
-    item_status: Optional[ItemStatus] = Query(None, description="Filter by item status"),
-    brand_id: Optional[UUID] = Query(None, description="Filter by brand ID"),
+    
+    # Essential filters only
     category_id: Optional[UUID] = Query(None, description="Filter by category ID"),
-    is_rentable: Optional[bool] = Query(None, description="Filter by rentable status"),
-    is_saleable: Optional[bool] = Query(None, description="Filter by saleable status"),
+    brand_id: Optional[UUID] = Query(None, description="Filter by brand ID"),
+    item_status: Optional[ItemStatus] = Query(None, description="Filter by item status"),
     active_only: bool = Query(True, description="Show only active items"),
+    
+    # Date range filters
+    created_after: Optional[str] = Query(None, description="Items created after this date (ISO format)"),
+    created_before: Optional[str] = Query(None, description="Items created before this date (ISO format)"),
+    updated_after: Optional[str] = Query(None, description="Items updated after this date (ISO format)"),
+    updated_before: Optional[str] = Query(None, description="Items updated before this date (ISO format)"),
+    
     service: ItemMasterService = Depends(get_item_master_service)
 ):
-    """Get all items with optional search and filtering. Supports text search across item name, code, SKU, and description. Combine search with filters for precise results."""
+    """Get all items with essential filtering. Supports filtering by category, brand, status, and date ranges."""
     return await service.get_items(
         skip=skip,
         limit=limit,
-        search=search,
-        item_status=item_status,
-        brand_id=brand_id,
         category_id=category_id,
-        is_rentable=is_rentable,
-        is_saleable=is_saleable,
-        active_only=active_only
+        brand_id=brand_id,
+        item_status=item_status,
+        active_only=active_only,
+        # Date filters
+        created_after=created_after,
+        created_before=created_before,
+        updated_after=updated_after,
+        updated_before=updated_before
     )
 
 

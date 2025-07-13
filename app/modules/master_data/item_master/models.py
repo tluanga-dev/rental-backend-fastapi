@@ -66,8 +66,9 @@ class Item(BaseModel):
     category_id = Column(UUIDType(), ForeignKey("categories.id"), nullable=True, comment="Category ID")
     unit_of_measurement_id = Column(UUIDType(), ForeignKey("units_of_measurement.id"), nullable=False, comment="Unit of measurement ID")
     rental_rate_per_period = Column(Numeric(10, 2), nullable=True, comment="Rental rate per period")
-    rental_period = Column(String(20), nullable=True, default="daily", comment="Rental period (daily, weekly, monthly)")
+    rental_period = Column(String(10), nullable=False, default="1", comment="Rental period (number of periods)")
     sale_price = Column(Numeric(10, 2), nullable=True, comment="Sale price")
+    purchase_price = Column(Numeric(10, 2), nullable=True, comment="Purchase price")
     security_deposit = Column(Numeric(10, 2), nullable=False, default=0.00, comment="Security deposit")
     description = Column(Text, nullable=True, comment="Item description")
     specifications = Column(Text, nullable=True, comment="Item specifications")
@@ -155,12 +156,20 @@ class Item(BaseModel):
         if self.sale_price and self.sale_price < 0:
             raise ValueError("Sale price cannot be negative")
         
+        if self.purchase_price and self.purchase_price < 0:
+            raise ValueError("Purchase price cannot be negative")
+        
         if self.security_deposit < 0:
             raise ValueError("Security deposit cannot be negative")
         
         # Rental period validation
-        if self.rental_period and self.rental_period not in ["daily", "weekly", "monthly", "hourly"]:
-            raise ValueError("Rental period must be one of: daily, weekly, monthly, hourly")
+        if self.rental_period:
+            try:
+                period_value = int(self.rental_period)
+                if period_value <= 0:
+                    raise ValueError("Rental period must be a positive integer")
+            except ValueError:
+                raise ValueError("Rental period must be a valid positive integer")
     
     
     def is_rental_item(self) -> bool:

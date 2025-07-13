@@ -1,6 +1,8 @@
 from typing import Optional, List
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
+import time
+import logging
 
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 from app.modules.master_data.item_master.models import Item, ItemStatus
@@ -19,24 +21,85 @@ class ItemMasterService:
         self.session = session
         self.item_repository = ItemMasterRepository(session)
         self.sku_generator = SKUGenerator(session)
+        self.logger = logging.getLogger(__name__)
     
     # Item operations
     async def create_item(self, item_data: ItemCreate) -> ItemResponse:
         """Create a new item with automatic SKU generation."""
-        # Generate SKU automatically using new format
-        sku = await self.sku_generator.generate_sku(
-            category_id=item_data.category_id,
-            item_name=item_data.item_name,
-            is_rentable=item_data.is_rentable,
-            is_saleable=item_data.is_saleable
-        )
+        start_time = time.time()
+        self.logger.info(f"Starting item creation for: {item_data.item_name}")
         
-        # Validate item type and pricing
-        self._validate_item_pricing(item_data)
-        
-        # Create item with generated SKU
-        item = await self.item_repository.create(item_data, sku)
-        return ItemResponse.model_validate(item)
+        try:
+            # Generate SKU automatically using new format
+            sku_start = time.time()
+            sku = await self.sku_generator.generate_sku(
+                category_id=item_data.category_id,
+                item_name=item_data.item_name,
+                is_rentable=item_data.is_rentable,
+                is_saleable=item_data.is_saleable
+            )
+            sku_time = time.time() - sku_start
+            self.logger.info(f"SKU generation completed in {sku_time:.3f}s. SKU: {sku}")
+            
+            # Validate item type and pricing
+            validation_start = time.time()
+            self._validate_item_pricing(item_data)
+            validation_time = time.time() - validation_start
+            self.logger.debug(f"Item validation completed in {validation_time:.3f}s")
+            
+            # Extract initial stock quantity before creating item
+            initial_stock_quantity = item_data.initial_stock_quantity
+            item_data_dict = item_data.model_dump()
+            # Remove initial_stock_quantity as it's not a model field
+            item_data_dict.pop('initial_stock_quantity', None)
+            
+            # Create ItemCreate without initial_stock_quantity
+            from app.modules.master_data.item_master.schemas import ItemCreate as ItemCreateClean
+            item_data_clean = ItemCreateClean(**item_data_dict)
+            
+            # Create item with generated SKU
+            db_start = time.time()
+            item = await self.item_repository.create(item_data_clean, sku)
+            db_time = time.time() - db_start
+            self.logger.info(f"Database insertion completed in {db_time:.3f}s")
+            
+            # Create initial stock if specified
+            if initial_stock_quantity and initial_stock_quantity > 0:
+                try:
+                    # Import inventory service to create initial stock
+                    from app.modules.inventory.service import InventoryService
+                    
+                    inventory_service = InventoryService(self.session)
+                    stock_result = await inventory_service.create_initial_stock(
+                        item_id=item.id,
+                        item_sku=sku,
+                        purchase_price=item_data.purchase_price,
+                        quantity=initial_stock_quantity
+                    )
+                    
+                    if stock_result.get("created"):
+                        self.logger.info(
+                            f"Created initial stock: {stock_result['total_quantity']} units "
+                            f"at {stock_result['location_name']} for item {item.id}. "
+                            f"Unit codes: {', '.join(stock_result['unit_codes'])}"
+                        )
+                    else:
+                        self.logger.warning(
+                            f"Failed to create initial stock: {stock_result.get('reason', 'Unknown error')}"
+                        )
+                except Exception as stock_error:
+                    self.logger.error(f"Exception during initial stock creation: {str(stock_error)}")
+                    # Don't fail item creation if stock creation fails
+            
+            total_time = time.time() - start_time
+            self.logger.info(f"Item creation completed successfully in {total_time:.3f}s. Item ID: {item.id}")
+            
+            return ItemResponse.model_validate(item)
+            
+        except Exception as e:
+            total_time = time.time() - start_time
+            self.logger.error(f"Item creation failed after {total_time:.3f}s: {str(e)}")
+            raise
     
     async def get_item(self, item_id: UUID) -> ItemResponse:
         """Get item by ID."""
@@ -58,25 +121,29 @@ class ItemMasterService:
         self, 
         skip: int = 0, 
         limit: int = 100,
-        search: Optional[str] = None,
-        item_status: Optional[ItemStatus] = None,
-        brand_id: Optional[UUID] = None,
         category_id: Optional[UUID] = None,
-        is_rentable: Optional[bool] = None,
-        is_saleable: Optional[bool] = None,
-        active_only: bool = True
+        brand_id: Optional[UUID] = None,
+        item_status: Optional[ItemStatus] = None,
+        active_only: bool = True,
+        # Date filters
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+        updated_after: Optional[str] = None,
+        updated_before: Optional[str] = None
     ) -> List[ItemListResponse]:
-        """Get all items with optional search and filtering."""
+        """Get all items with essential filtering."""
         items = await self.item_repository.get_all(
             skip=skip,
             limit=limit,
-            search=search,
             item_status=item_status,
             brand_id=brand_id,
             category_id=category_id,
-            is_rentable=is_rentable,
-            is_saleable=is_saleable,
-            active_only=active_only
+            active_only=active_only,
+            # Date filters
+            created_after=created_after,
+            created_before=created_before,
+            updated_after=updated_after,
+            updated_before=updated_before
         )
         
         return [ItemListResponse.model_validate(item) for item in items]

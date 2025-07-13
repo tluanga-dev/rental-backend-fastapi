@@ -82,7 +82,6 @@ async def get_items(
     return await service.get_items(
         skip=skip,
         limit=limit,
-        item_type=item_type,
         item_status=item_status,
         brand_id=brand_id,
         category_id=category_id,
@@ -451,3 +450,96 @@ async def bulk_generate_skus(
 ):
     """Generate SKUs for all existing items that don't have them."""
     return await service.bulk_generate_skus()
+
+
+# Stock Query endpoints for initial stock integration
+@router.get("/items/{item_id}/stock", response_model=List[StockLevelResponse])
+async def get_item_stock_levels(
+    item_id: UUID,
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get all stock levels for a specific item across all locations."""
+    try:
+        return await service.get_stock_levels(item_id=item_id)
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/items/{item_id}/units", response_model=List[InventoryUnitResponse])
+async def get_item_inventory_units(
+    item_id: UUID,
+    location_id: Optional[UUID] = None,
+    status: Optional[InventoryUnitStatus] = None,
+    condition: Optional[InventoryUnitCondition] = None,
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get all inventory units for a specific item with optional filtering."""
+    try:
+        return await service.get_inventory_units(
+            item_id=item_id,
+            location_id=location_id,
+            status=status,
+            condition=condition
+        )
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/items/{item_id}/stock-summary")
+async def get_item_stock_summary(
+    item_id: UUID,
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get comprehensive stock summary for an item."""
+    try:
+        # Get all stock levels for the item
+        stock_levels = await service.get_stock_levels(item_id=item_id)
+        
+        # Get all inventory units for the item
+        inventory_units = await service.get_inventory_units(item_id=item_id)
+        
+        # Calculate summary statistics
+        total_on_hand = sum(int(stock.quantity_on_hand) for stock in stock_levels)
+        total_available = sum(int(stock.quantity_available) for stock in stock_levels)
+        total_reserved = sum(int(stock.quantity_reserved) for stock in stock_levels)
+        
+        # Count units by status
+        units_by_status = {}
+        for unit in inventory_units:
+            status_key = unit.status.value
+            units_by_status[status_key] = units_by_status.get(status_key, 0) + 1
+        
+        # Count units by location
+        units_by_location = {}
+        for unit in inventory_units:
+            loc_key = str(unit.location_id)
+            units_by_location[loc_key] = units_by_location.get(loc_key, 0) + 1
+        
+        return {
+            "item_id": str(item_id),
+            "total_stock_levels": len(stock_levels),
+            "total_inventory_units": len(inventory_units),
+            "aggregate_quantities": {
+                "on_hand": total_on_hand,
+                "available": total_available,
+                "reserved": total_reserved
+            },
+            "units_by_status": units_by_status,
+            "units_by_location": units_by_location,
+            "stock_levels": stock_levels,
+            "has_initial_stock": len(inventory_units) > 0
+        }
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/locations/{location_id}/stock", response_model=List[StockLevelResponse])
+async def get_location_stock_levels(
+    location_id: UUID,
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get all stock levels at a specific location."""
+    try:
+        return await service.get_stock_levels(location_id=location_id)
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

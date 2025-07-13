@@ -19,15 +19,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add is_rentable column with default True
-    op.add_column('items', sa.Column('is_rentable', sa.Boolean(), nullable=False, default=True, comment='Item can be rented'))
+    # Add is_rentable column as nullable first
+    op.add_column('items', sa.Column('is_rentable', sa.Boolean(), nullable=True, comment='Item can be rented'))
     
-    # Add is_saleable column with default False
-    op.add_column('items', sa.Column('is_saleable', sa.Boolean(), nullable=False, default=False, comment='Item can be sold'))
+    # Add is_saleable column as nullable first
+    op.add_column('items', sa.Column('is_saleable', sa.Boolean(), nullable=True, comment='Item can be sold'))
     
     # Set default values for existing records
     op.execute("UPDATE items SET is_rentable = TRUE WHERE is_rentable IS NULL")
     op.execute("UPDATE items SET is_saleable = FALSE WHERE is_saleable IS NULL")
+    
+    # Now make the columns non-nullable
+    op.alter_column('items', 'is_rentable', nullable=False)
+    op.alter_column('items', 'is_saleable', nullable=False)
 
 
 def downgrade() -> None:

@@ -6,12 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 from app.modules.master_data.item_master.models import Item, ItemStatus
+from app.modules.master_data.locations.models import Location
 from app.modules.inventory.models import (
     InventoryUnit, StockLevel, InventoryUnitStatus, InventoryUnitCondition
 )
 from app.modules.inventory.repository import (
     ItemRepository, InventoryUnitRepository, StockLevelRepository
 )
+from app.modules.master_data.locations.repository import LocationRepository
 from app.modules.master_data.item_master.schemas import (
     ItemCreate, ItemUpdate, ItemResponse, ItemListResponse, ItemWithInventoryResponse,
     SKUGenerationRequest, SKUGenerationResponse, SKUBulkGenerationResponse
@@ -33,6 +35,7 @@ class InventoryService:
         self.item_repository = ItemRepository(session)
         self.inventory_unit_repository = InventoryUnitRepository(session)
         self.stock_level_repository = StockLevelRepository(session)
+        self.location_repository = LocationRepository(session)
         self.sku_generator = SKUGenerator(session)
     
     # Item operations
@@ -558,3 +561,232 @@ class InventoryService:
                 quantity_available="1" if unit.is_available() else "0"
             )
             await self.stock_level_repository.create(stock_data)
+    
+    # Helper methods for initial stock creation
+    async def get_default_location(self) -> Location:
+        """Get the default location for inventory operations."""
+        # Try to get the first active location
+        locations = await self.location_repository.get_all(skip=0, limit=1, active_only=True)
+        
+        if locations:
+            return locations[0]
+        
+        # If no locations exist, create a default one
+        from app.modules.master_data.locations.schemas import LocationCreate
+        default_location_data = LocationCreate(
+            location_code="DEFAULT",
+            location_name="Default Warehouse",
+            location_type="WAREHOUSE",
+            address_line1="Main Storage Facility",
+            city="Default City",
+            state="N/A",
+            postal_code="00000",
+            country="USA",
+            description="Default location for initial inventory"
+        )
+        
+        return await self.location_repository.create(default_location_data)
+    
+    def generate_unit_code(self, item_sku: str, sequence: int) -> str:
+        """Generate a unique unit code for an inventory unit."""
+        return f"{item_sku}-U{sequence:03d}"
+    
+    async def create_initial_stock(
+        self, 
+        item_id: UUID, 
+        item_sku: str, 
+        purchase_price: Optional[Decimal], 
+        quantity: int,
+        location_id: Optional[UUID] = None
+    ) -> Dict[str, Any]:
+        """
+        Create initial stock for a new item.
+        
+        Args:
+            item_id: The item's UUID
+            item_sku: The item's SKU for unit code generation
+            purchase_price: Purchase price for inventory units
+            quantity: Number of units to create
+            location_id: Location ID (uses default if None)
+            
+        Returns:
+            Dictionary with creation summary
+        """
+        # Business rule validation
+        validation_result = await self._validate_initial_stock_business_rules(
+            item_id, item_sku, purchase_price, quantity, location_id
+        )
+        if not validation_result["valid"]:
+            return {"created": False, "reason": validation_result["reason"]}
+        
+        try:
+            # Get location
+            if location_id:
+                location = await self.location_repository.get_by_id(location_id)
+                if not location:
+                    raise NotFoundError(f"Location with ID {location_id} not found")
+            else:
+                location = await self.get_default_location()
+            
+            # Check if stock level already exists
+            existing_stock = await self.stock_level_repository.get_by_item_location(
+                item_id, location.id
+            )
+            if existing_stock:
+                raise ConflictError(f"Stock level already exists for item {item_id} at location {location.id}")
+            
+            # Create stock level first
+            stock_data = StockLevelCreate(
+                item_id=item_id,
+                location_id=location.id,
+                quantity_on_hand=str(quantity),
+                quantity_available=str(quantity),
+                quantity_reserved="0",
+                quantity_on_order="0",
+                minimum_level="0",
+                maximum_level="0",
+                reorder_point="0"
+            )
+            
+            stock_level = await self.stock_level_repository.create(stock_data)
+            
+            # Create individual inventory units
+            created_units = []
+            for i in range(1, quantity + 1):
+                unit_code = self.generate_unit_code(item_sku, i)
+                
+                unit_data = InventoryUnitCreate(
+                    item_id=item_id,
+                    location_id=location.id,
+                    unit_code=unit_code,
+                    status=InventoryUnitStatus.AVAILABLE,
+                    condition=InventoryUnitCondition.NEW,
+                    purchase_price=purchase_price or Decimal("0.00"),
+                    purchase_date=datetime.utcnow()
+                )
+                
+                unit = await self.inventory_unit_repository.create(unit_data)
+                created_units.append(unit.unit_code)
+            
+            return {
+                "created": True,
+                "stock_level_id": str(stock_level.id),
+                "location_id": str(location.id),
+                "location_name": location.location_name,
+                "total_quantity": quantity,
+                "unit_codes": created_units,
+                "purchase_price": str(purchase_price) if purchase_price else "0.00"
+            }
+            
+        except Exception as e:
+            # Roll back the transaction on error
+            await self.session.rollback()
+            raise e
+    
+    async def _validate_initial_stock_business_rules(
+        self, 
+        item_id: UUID, 
+        item_sku: str, 
+        purchase_price: Optional[Decimal], 
+        quantity: int,
+        location_id: Optional[UUID] = None
+    ) -> Dict[str, Any]:
+        """
+        Validate business rules for initial stock creation.
+        
+        Args:
+            item_id: The item's UUID
+            item_sku: The item's SKU
+            purchase_price: Purchase price for inventory units
+            quantity: Number of units to create
+            location_id: Location ID (optional)
+            
+        Returns:
+            Dictionary with validation result: {"valid": bool, "reason": str}
+        """
+        # Rule 1: Quantity must be positive
+        if quantity <= 0:
+            return {"valid": False, "reason": "Quantity must be greater than 0"}
+        
+        # Rule 2: Quantity must be reasonable (max 10,000 units per initial creation)
+        if quantity > 10000:
+            return {"valid": False, "reason": "Initial stock quantity cannot exceed 10,000 units"}
+        
+        # Rule 3: Item must exist and be active
+        try:
+            item = await self.item_repository.get_by_id(item_id)
+            if not item:
+                return {"valid": False, "reason": f"Item with ID {item_id} not found"}
+            
+            if not item.is_active:
+                return {"valid": False, "reason": "Cannot create stock for inactive items"}
+                
+        except Exception as e:
+            return {"valid": False, "reason": f"Error validating item: {str(e)}"}
+        
+        # Rule 4: SKU must be valid and match the item
+        if not item_sku or not item_sku.strip():
+            return {"valid": False, "reason": "Item SKU cannot be empty"}
+        
+        if len(item_sku) > 50:
+            return {"valid": False, "reason": "Item SKU cannot exceed 50 characters"}
+        
+        if item.sku != item_sku:
+            return {"valid": False, "reason": f"SKU mismatch: expected {item.sku}, got {item_sku}"}
+        
+        # Rule 5: Purchase price validation
+        if purchase_price is not None:
+            if purchase_price < 0:
+                return {"valid": False, "reason": "Purchase price cannot be negative"}
+            
+            if purchase_price > Decimal("999999.99"):
+                return {"valid": False, "reason": "Purchase price cannot exceed $999,999.99"}
+        
+        # Rule 6: No existing stock should exist for this item (this is initial stock)
+        try:
+            existing_stock_levels = await self.stock_level_repository.get_all(
+                item_id=item_id, skip=0, limit=1, active_only=True
+            )
+            if existing_stock_levels:
+                return {
+                    "valid": False, 
+                    "reason": f"Item {item_id} already has existing stock levels. Use stock adjustment instead."
+                }
+            
+            existing_inventory_units = await self.inventory_unit_repository.get_units_by_item(item_id)
+            if existing_inventory_units:
+                return {
+                    "valid": False, 
+                    "reason": f"Item {item_id} already has existing inventory units. Use stock adjustment instead."
+                }
+                
+        except Exception as e:
+            return {"valid": False, "reason": f"Error checking existing stock: {str(e)}"}
+        
+        # Rule 7: Location validation (if provided)
+        if location_id:
+            try:
+                location = await self.location_repository.get_by_id(location_id)
+                if not location:
+                    return {"valid": False, "reason": f"Location with ID {location_id} not found"}
+                
+                if not location.is_active:
+                    return {"valid": False, "reason": "Cannot create stock at inactive location"}
+                    
+            except Exception as e:
+                return {"valid": False, "reason": f"Error validating location: {str(e)}"}
+        
+        # Rule 8: Unique unit code validation (ensure no conflicts)
+        try:
+            for i in range(1, min(quantity + 1, 6)):  # Check first 5 unit codes for conflicts
+                test_unit_code = self.generate_unit_code(item_sku, i)
+                existing_unit = await self.inventory_unit_repository.get_by_code(test_unit_code)
+                if existing_unit:
+                    return {
+                        "valid": False, 
+                        "reason": f"Unit code conflict: {test_unit_code} already exists"
+                    }
+        except Exception as e:
+            return {"valid": False, "reason": f"Error validating unit codes: {str(e)}"}
+        
+        return {"valid": True, "reason": "All business rules passed"}

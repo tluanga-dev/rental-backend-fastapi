@@ -136,7 +136,7 @@ class Supplier(BaseModel):
     certifications = Column(Text, nullable=True, comment="Certifications held")
     
     # Relationships
-    items = relationship("Item", back_populates="supplier", lazy="select")
+    # items = relationship("Item", back_populates="supplier", lazy="select")  # TODO: Add supplier_id to Item model
     
     # Indexes for efficient queries
     __table_args__ = (

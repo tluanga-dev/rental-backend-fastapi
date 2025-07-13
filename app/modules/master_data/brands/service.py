@@ -227,8 +227,8 @@ class BrandService:
                     filter_dict[key] = value
         
         # Set sort options
-        sort_by = sort.field if sort else "name"
-        sort_order = sort.direction if sort else "asc"
+        sort_by = sort.field if sort and sort.field else "name"
+        sort_order = sort.direction if sort and sort.direction else "asc"
         
         # Get paginated brands
         brands_list = await self.repository.get_paginated(

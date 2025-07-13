@@ -75,7 +75,8 @@ async def test_boolean_field_validation():
         }
         default_item = ItemCreate(**default_item_data)
         print(f"   ✅ Default values: rentable={default_item.is_rentable}, saleable={default_item.is_saleable}")
-        print(f"   ✅ Expected: rentable=True, saleable=False")
+        print(f"   ✅ Default rental_period: {default_item.rental_period}")
+        print(f"   ✅ Expected: rentable=True, saleable=False, rental_period=1")
     except Exception as e:
         print(f"   ❌ Default values failed: {e}")
     
@@ -190,6 +191,7 @@ def test_business_logic():
     print("✅ Required Choice: Items must be either rentable OR saleable")
     print("✅ Default Behavior: New items default to rentable=True, saleable=False")
     print("✅ Pricing Rules: Rentable items need rental pricing, saleable items need sale pricing")
+    print("✅ Rental Period: Defaults to 1 (positive integer) for flexible period specification")
     print("✅ Clean Implementation: Only boolean fields control item behavior")
 
 

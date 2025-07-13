@@ -36,6 +36,8 @@ class ItemMasterRepository:
             item.rental_period = item_data.rental_period
         if item_data.sale_price:
             item.sale_price = item_data.sale_price
+        if item_data.purchase_price is not None:
+            item.purchase_price = item_data.purchase_price
         if item_data.security_deposit:
             item.security_deposit = item_data.security_deposit
         if item_data.description:
@@ -86,18 +88,20 @@ class ItemMasterRepository:
         self, 
         skip: int = 0, 
         limit: int = 100,
-        search: Optional[str] = None,
         item_status: Optional[ItemStatus] = None,
         brand_id: Optional[UUID] = None,
         category_id: Optional[UUID] = None,
-        is_rentable: Optional[bool] = None,
-        is_saleable: Optional[bool] = None,
-        active_only: bool = True
+        active_only: bool = True,
+        # Date filters
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+        updated_after: Optional[str] = None,
+        updated_before: Optional[str] = None
     ) -> List[Item]:
-        """Get all items with optional search and filtering."""
+        """Get all items with essential filtering."""
         query = select(Item)
         
-        # Apply filters
+        # Apply essential filters only
         conditions = []
         if active_only:
             conditions.append(Item.is_active == True)
@@ -107,19 +111,24 @@ class ItemMasterRepository:
             conditions.append(Item.brand_id == brand_id)
         if category_id:
             conditions.append(Item.category_id == category_id)
-        if is_rentable is not None:
-            conditions.append(Item.is_rentable == is_rentable)
-        if is_saleable is not None:
-            conditions.append(Item.is_saleable == is_saleable)
         
-        # Apply search
-        if search:
-            search_condition = or_(
-                Item.item_name.ilike(f"%{search}%"),
-                Item.sku.ilike(f"%{search}%"),
-                Item.description.ilike(f"%{search}%")
-            )
-            conditions.append(search_condition)
+        # Date range filters
+        if created_after:
+            from datetime import datetime
+            created_after_dt = datetime.fromisoformat(created_after.replace('Z', '+00:00'))
+            conditions.append(Item.created_at >= created_after_dt)
+        if created_before:
+            from datetime import datetime
+            created_before_dt = datetime.fromisoformat(created_before.replace('Z', '+00:00'))
+            conditions.append(Item.created_at <= created_before_dt)
+        if updated_after:
+            from datetime import datetime
+            updated_after_dt = datetime.fromisoformat(updated_after.replace('Z', '+00:00'))
+            conditions.append(Item.updated_at >= updated_after_dt)
+        if updated_before:
+            from datetime import datetime
+            updated_before_dt = datetime.fromisoformat(updated_before.replace('Z', '+00:00'))
+            conditions.append(Item.updated_at <= updated_before_dt)
         
         if conditions:
             query = query.where(and_(*conditions))

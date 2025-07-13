@@ -486,3 +486,67 @@ class TransactionSearch(BaseModel):
             if v < info.data.get('amount_from'):
                 raise ValueError("Amount to must be greater than amount from")
         return v
+
+
+# Purchase-specific schemas
+class PurchaseItemCreate(BaseModel):
+    """Schema for creating a purchase item."""
+    item_id: UUID = Field(..., description="Item ID")
+    quantity: int = Field(..., ge=1, description="Quantity")
+    unit_cost: Decimal = Field(..., ge=0, description="Unit cost")
+    tax_rate: Optional[Decimal] = Field(0, ge=0, le=100, description="Tax rate percentage")
+    discount_amount: Optional[Decimal] = Field(0, ge=0, description="Discount amount")
+    condition: str = Field(..., pattern="^[A-D]$", description="Item condition (A, B, C, or D)")
+    notes: Optional[str] = Field(None, max_length=500, description="Additional notes")
+
+
+class PurchaseCreate(BaseModel):
+    """Schema for creating a purchase transaction."""
+    supplier_id: UUID = Field(..., description="Supplier ID")
+    location_id: UUID = Field(..., description="Location ID")
+    purchase_date: date = Field(..., description="Purchase date")
+    tax_amount: Optional[Decimal] = Field(0, ge=0, description="Total tax amount")
+    discount_amount: Optional[Decimal] = Field(0, ge=0, description="Total discount amount")
+    notes: Optional[str] = Field(None, description="Additional notes")
+    reference_number: Optional[str] = Field(None, max_length=50, description="Reference number")
+    items: List[PurchaseItemCreate] = Field(..., min_length=1, description="Purchase items")
+
+
+class PurchaseResponse(BaseModel):
+    """Schema for purchase response - maps transaction data to purchase format."""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: UUID
+    supplier_id: UUID = Field(..., description="Supplier ID (mapped from customer_id)")
+    purchase_date: date = Field(..., description="Purchase date (mapped from transaction_date)")
+    reference_number: Optional[str] = Field(None, description="Reference number (mapped from transaction_number)")
+    notes: Optional[str] = Field(None, description="Additional notes")
+    subtotal: Decimal = Field(..., description="Subtotal amount")
+    tax_amount: Decimal = Field(..., description="Tax amount")
+    discount_amount: Decimal = Field(..., description="Discount amount")
+    total_amount: Decimal = Field(..., description="Total amount")
+    status: str = Field(..., description="Purchase status")
+    payment_status: str = Field(..., description="Payment status")
+    created_at: datetime
+    updated_at: datetime
+    items: List[TransactionLineResponse] = Field(default_factory=list, description="Purchase items")
+    
+    @classmethod
+    def from_transaction(cls, transaction: dict) -> "PurchaseResponse":
+        """Create PurchaseResponse from TransactionHeaderResponse data."""
+        return cls(
+            id=transaction["id"],
+            supplier_id=transaction["customer_id"],  # Map customer_id to supplier_id
+            purchase_date=transaction["transaction_date"].date() if isinstance(transaction["transaction_date"], datetime) else transaction["transaction_date"],
+            reference_number=transaction.get("transaction_number"),
+            notes=transaction.get("notes"),
+            subtotal=transaction["subtotal"],
+            tax_amount=transaction["tax_amount"],
+            discount_amount=transaction["discount_amount"],
+            total_amount=transaction["total_amount"],
+            status=transaction["status"],
+            payment_status=transaction["payment_status"],
+            created_at=transaction["created_at"],
+            updated_at=transaction["updated_at"],
+            items=transaction.get("transaction_lines", [])
+        )

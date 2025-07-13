@@ -17,8 +17,10 @@ class ItemCreate(BaseModel):
     category_id: Optional[UUID] = Field(None, description="Category ID")
     unit_of_measurement_id: UUID = Field(..., description="Unit of measurement ID")
     rental_rate_per_period: Optional[Decimal] = Field(None, ge=0, description="Rental rate per period")
-    rental_period: Optional[str] = Field(default="daily", description="Rental period (daily, weekly, monthly, hourly)")
+    rental_period: Optional[str] = Field(default="1", description="Rental period (number of periods)")
     sale_price: Optional[Decimal] = Field(None, ge=0, description="Sale price")
+    purchase_price: Optional[Decimal] = Field(None, ge=0, description="Purchase price")
+    initial_stock_quantity: Optional[int] = Field(None, ge=0, description="Initial stock quantity (only for creation)")
     security_deposit: Decimal = Field(default=Decimal("0.00"), ge=0, description="Security deposit")
     description: Optional[str] = Field(None, description="Item description")
     specifications: Optional[str] = Field(None, description="Item specifications")
@@ -30,7 +32,7 @@ class ItemCreate(BaseModel):
     is_rentable: bool = Field(default=True, description="Item can be rented")
     is_saleable: bool = Field(default=False, description="Item can be sold")
     
-    @field_validator('warranty_period_days', 'reorder_level', 'reorder_quantity')
+    @field_validator('warranty_period_days', 'reorder_level', 'reorder_quantity', 'rental_period')
     @classmethod
     def validate_numeric_string(cls, v):
         if v is not None and v != "":
@@ -43,8 +45,13 @@ class ItemCreate(BaseModel):
     @field_validator('rental_period')
     @classmethod
     def validate_rental_period(cls, v):
-        if v is not None and v not in ["daily", "weekly", "monthly", "hourly"]:
-            raise ValueError("Rental period must be one of: daily, weekly, monthly, hourly")
+        if v is not None:
+            try:
+                period_value = int(v)
+                if period_value <= 0:
+                    raise ValueError("Rental period must be a positive integer")
+            except ValueError:
+                raise ValueError("Rental period must be a valid positive integer")
         return v
     
     @field_validator('is_saleable')
@@ -72,8 +79,9 @@ class ItemUpdate(BaseModel):
     category_id: Optional[UUID] = Field(None, description="Category ID")
     unit_of_measurement_id: Optional[UUID] = Field(None, description="Unit of measurement ID")
     rental_rate_per_period: Optional[Decimal] = Field(None, ge=0, description="Rental rate per period")
-    rental_period: Optional[str] = Field(None, description="Rental period (daily, weekly, monthly, hourly)")
+    rental_period: Optional[str] = Field(None, description="Rental period (number of periods)")
     sale_price: Optional[Decimal] = Field(None, ge=0, description="Sale price")
+    purchase_price: Optional[Decimal] = Field(None, ge=0, description="Purchase price")
     security_deposit: Optional[Decimal] = Field(None, ge=0, description="Security deposit")
     description: Optional[str] = Field(None, description="Item description")
     specifications: Optional[str] = Field(None, description="Item specifications")
@@ -85,7 +93,7 @@ class ItemUpdate(BaseModel):
     is_rentable: Optional[bool] = Field(None, description="Item can be rented")
     is_saleable: Optional[bool] = Field(None, description="Item can be sold")
     
-    @field_validator('warranty_period_days', 'reorder_level', 'reorder_quantity')
+    @field_validator('warranty_period_days', 'reorder_level', 'reorder_quantity', 'rental_period')
     @classmethod
     def validate_numeric_string(cls, v):
         if v is not None and v != "":
@@ -120,6 +128,7 @@ class ItemResponse(BaseModel):
     rental_rate_per_period: Optional[Decimal]
     rental_period: Optional[str]
     sale_price: Optional[Decimal]
+    purchase_price: Optional[Decimal]
     security_deposit: Decimal
     description: Optional[str]
     specifications: Optional[str]
@@ -160,6 +169,7 @@ class ItemListResponse(BaseModel):
     item_status: ItemStatus
     rental_rate_per_period: Optional[Decimal]
     sale_price: Optional[Decimal]
+    purchase_price: Optional[Decimal]
     is_rentable: bool
     is_saleable: bool
     is_active: bool
@@ -186,6 +196,7 @@ class ItemWithInventoryResponse(BaseModel):
     rental_rate_per_period: Optional[Decimal]
     rental_period: Optional[str]
     sale_price: Optional[Decimal]
+    purchase_price: Optional[Decimal]
     security_deposit: Decimal
     description: Optional[str]
     specifications: Optional[str]
