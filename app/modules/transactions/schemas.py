@@ -469,6 +469,59 @@ class TransactionWithLinesResponse(BaseModel):
         return len(self.transaction_lines)
 
 
+class TransactionHeaderWithLinesListResponse(BaseModel):
+    """Schema for transaction header list response with nested line items."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    transaction_number: str
+    transaction_type: TransactionType
+    transaction_date: datetime
+    customer_id: UUID
+    location_id: UUID
+    sales_person_id: Optional[UUID]
+    status: TransactionStatus
+    payment_status: PaymentStatus
+    subtotal: Decimal
+    discount_amount: Decimal
+    tax_amount: Decimal
+    total_amount: Decimal
+    paid_amount: Decimal
+    deposit_amount: Decimal
+    reference_transaction_id: Optional[UUID]
+    rental_start_date: Optional[date]
+    rental_end_date: Optional[date]
+    actual_return_date: Optional[date]
+    notes: Optional[str]
+    payment_method: Optional[PaymentMethod]
+    payment_reference: Optional[str]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    transaction_lines: List[TransactionLineResponse] = []
+
+    @computed_field
+    @property
+    def display_name(self) -> str:
+        return f"{self.transaction_number} - {self.transaction_type.value}"
+
+    @computed_field
+    @property
+    def balance_due(self) -> Decimal:
+        return max(self.total_amount - self.paid_amount, Decimal("0.00"))
+
+    @computed_field
+    @property
+    def is_paid_in_full(self) -> bool:
+        return self.paid_amount >= self.total_amount
+
+    @computed_field
+    @property
+    def line_count(self) -> int:
+        return len(self.transaction_lines)
+
+
 class TransactionSummary(BaseModel):
     """Schema for transaction summary."""
 
@@ -522,6 +575,35 @@ class TransactionSearch(BaseModel):
 
 
 # Purchase-specific schemas
+
+# Nested response schemas for purchase details
+class SupplierNestedResponse(BaseModel):
+    """Schema for nested supplier response in purchase transactions."""
+    
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: UUID
+    name: str = Field(..., description="Supplier name")
+
+
+class LocationNestedResponse(BaseModel):
+    """Schema for nested location response in purchase transactions."""
+    
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: UUID
+    name: str = Field(..., description="Location name")
+
+
+class ItemNestedResponse(BaseModel):
+    """Schema for nested item response in purchase transactions."""
+    
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: UUID
+    name: str = Field(..., description="Item name")
+
+
 class PurchaseItemCreate(BaseModel):
     """Schema for creating a purchase item."""
 
@@ -532,6 +614,57 @@ class PurchaseItemCreate(BaseModel):
     discount_amount: Optional[Decimal] = Field(0, ge=0, description="Discount amount")
     condition: str = Field(..., pattern="^[A-D]$", description="Item condition (A, B, C, or D)")
     notes: Optional[str] = Field("", description="Additional notes")
+
+
+class PurchaseLineItemResponse(BaseModel):
+    """Schema for purchase line item response with purchase-specific fields."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    item: ItemNestedResponse = Field(..., description="Item details")
+    quantity: Decimal
+    unit_cost: Decimal = Field(..., description="Unit cost per item")
+    tax_rate: Decimal = Field(..., description="Tax rate percentage")
+    discount_amount: Decimal = Field(..., description="Discount amount")
+    condition: str = Field(..., description="Item condition (A, B, C, or D)")
+    notes: str = Field(default="", description="Additional notes")
+    tax_amount: Decimal = Field(..., description="Calculated tax amount")
+    line_total: Decimal = Field(..., description="Total line amount")
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_transaction_line(cls, line: dict, item_details: dict = None) -> "PurchaseLineItemResponse":
+        """Create PurchaseLineItemResponse from TransactionLine data."""
+        # Extract condition from description if available
+        condition = "A"  # Default condition
+        description = line.get("description", "")
+        if "(Condition: " in description and ")" in description:
+            condition_start = description.find("(Condition: ") + len("(Condition: ")
+            condition_end = description.find(")", condition_start)
+            condition = description[condition_start:condition_end].strip()
+        
+        # Create item nested response
+        item_nested = ItemNestedResponse(
+            id=item_details["id"] if item_details else line["item_id"],
+            name=item_details["name"] if item_details else "Unknown Item"
+        )
+        
+        return cls(
+            id=line["id"],
+            item=item_nested,
+            quantity=line["quantity"],
+            unit_cost=line["unit_price"],  # Map unit_price to unit_cost
+            tax_rate=line["tax_rate"],
+            discount_amount=line["discount_amount"],
+            condition=condition,
+            notes=line.get("notes", ""),
+            tax_amount=line["tax_amount"],
+            line_total=line["line_total"],
+            created_at=line["created_at"],
+            updated_at=line["updated_at"],
+        )
 
 
 class PurchaseCreate(BaseModel):
@@ -596,7 +729,8 @@ class PurchaseResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    supplier_id: UUID = Field(..., description="Supplier ID (mapped from customer_id)")
+    supplier: SupplierNestedResponse = Field(..., description="Supplier details")
+    location: LocationNestedResponse = Field(..., description="Location details")
     purchase_date: date = Field(..., description="Purchase date (mapped from transaction_date)")
     reference_number: Optional[str] = Field(
         None, description="Reference number (mapped from transaction_number)"
@@ -610,14 +744,34 @@ class PurchaseResponse(BaseModel):
     payment_status: str = Field(..., description="Payment status")
     created_at: datetime
     updated_at: datetime
-    items: List[TransactionLineResponse] = Field(default_factory=list, description="Purchase items")
+    items: List[PurchaseLineItemResponse] = Field(default_factory=list, description="Purchase items")
 
     @classmethod
-    def from_transaction(cls, transaction: dict) -> "PurchaseResponse":
+    def from_transaction(cls, transaction: dict, supplier_details: dict = None, location_details: dict = None, items_details: dict = None) -> "PurchaseResponse":
         """Create PurchaseResponse from TransactionHeaderResponse data."""
+        # Create nested supplier response
+        supplier_nested = SupplierNestedResponse(
+            id=supplier_details["id"] if supplier_details else transaction["customer_id"],
+            name=supplier_details["name"] if supplier_details else "Unknown Supplier"
+        )
+        
+        # Create nested location response
+        location_nested = LocationNestedResponse(
+            id=location_details["id"] if location_details else transaction["location_id"],
+            name=location_details["name"] if location_details else "Unknown Location"
+        )
+        
+        # Transform transaction lines to purchase line items
+        purchase_items = []
+        items_details = items_details or {}
+        for line in transaction.get("transaction_lines", []):
+            item_detail = items_details.get(str(line["item_id"]), None)
+            purchase_items.append(PurchaseLineItemResponse.from_transaction_line(line, item_detail))
+        
         return cls(
             id=transaction["id"],
-            supplier_id=transaction["customer_id"],  # Map customer_id to supplier_id
+            supplier=supplier_nested,
+            location=location_nested,
             purchase_date=transaction["transaction_date"].date()
             if isinstance(transaction["transaction_date"], datetime)
             else transaction["transaction_date"],
@@ -631,5 +785,90 @@ class PurchaseResponse(BaseModel):
             payment_status=transaction["payment_status"],
             created_at=transaction["created_at"],
             updated_at=transaction["updated_at"],
-            items=transaction.get("transaction_lines", []),
+            items=purchase_items,
         )
+
+
+# Rental-specific schemas
+
+class RentalItemCreate(BaseModel):
+    """Schema for creating a rental item."""
+    
+    item_id: str = Field(..., description="Item ID")
+    quantity: int = Field(..., ge=0, description="Quantity")
+    rental_period_value: int = Field(..., ge=0, description="Rental period value")
+    tax_rate: Optional[Decimal] = Field(0, ge=0, le=100, description="Tax rate percentage")
+    discount_amount: Optional[Decimal] = Field(0, ge=0, description="Discount amount")
+    rental_start_date: str = Field(..., description="Rental start date in YYYY-MM-DD format")
+    rental_end_date: str = Field(..., description="Rental end date in YYYY-MM-DD format")
+    notes: Optional[str] = Field("", description="Additional notes")
+    
+    @field_validator("rental_start_date", "rental_end_date")
+    @classmethod
+    def validate_rental_dates(cls, v):
+        """Validate and parse rental dates."""
+        try:
+            from datetime import datetime
+            return datetime.strptime(v, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError("Invalid date format. Use YYYY-MM-DD format.")
+    
+    @model_validator(mode="after")
+    def validate_rental_date_range(self):
+        """Validate rental end date is after start date."""
+        if self.rental_end_date <= self.rental_start_date:
+            raise ValueError("Rental end date must be after start date")
+        return self
+
+
+class NewRentalRequest(BaseModel):
+    """Schema for the new-rental endpoint - matches frontend JSON structure exactly."""
+    
+    transaction_date: str = Field(..., description="Transaction date in YYYY-MM-DD format")
+    customer_id: str = Field(..., description="Customer ID")
+    location_id: str = Field(..., description="Location ID")
+    payment_method: str = Field(..., description="Payment method")
+    payment_reference: Optional[str] = Field("", description="Payment reference")
+    notes: Optional[str] = Field("", description="Additional notes")
+    items: List[RentalItemCreate] = Field(..., min_length=1, description="Rental items")
+    
+    @field_validator("transaction_date")
+    @classmethod
+    def validate_transaction_date(cls, v):
+        """Validate and parse transaction date."""
+        try:
+            from datetime import datetime
+            return datetime.strptime(v, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError("Invalid date format. Use YYYY-MM-DD format.")
+    
+    @field_validator("customer_id", "location_id")
+    @classmethod
+    def validate_uuids(cls, v):
+        """Validate UUID strings."""
+        try:
+            from uuid import UUID
+            return UUID(v)
+        except ValueError:
+            raise ValueError(f"Invalid UUID format: {v}")
+    
+    @field_validator("payment_method")
+    @classmethod
+    def validate_payment_method(cls, v):
+        """Validate payment method."""
+        valid_methods = ["CASH", "CARD", "BANK_TRANSFER", "CHECK", "ONLINE"]
+        if v not in valid_methods:
+            raise ValueError(f"Invalid payment method. Must be one of: {', '.join(valid_methods)}")
+        return v
+
+
+class NewRentalResponse(BaseModel):
+    """Schema for new-rental response."""
+    
+    model_config = ConfigDict(from_attributes=True)
+    
+    success: bool = Field(True, description="Operation success status")
+    message: str = Field("Rental created successfully", description="Response message")
+    data: dict = Field(..., description="Rental transaction data")
+    transaction_id: UUID = Field(..., description="Created transaction ID")
+    transaction_number: str = Field(..., description="Generated transaction number")

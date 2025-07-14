@@ -1,0 +1,22 @@
+Rental Transaction Payload
+This JSON payload is used to create or update a rental transaction in the system. It includes details
+{
+  “transaction_date”:”string”,
+  "customer_id": "string",
+  "location_id": "string",
+  "payment_method": "string",
+  "payment_reference": "",
+  "notes": "",
+  "items": [
+    {
+      "item_id": "string",
+      "quantity": 0,
+      "rental_period_value": 0,
+      "tax_rate": 0,
+      "discount_amount": 0,
+	"rental_start_date": "string",
+  	"rental_end_date": "string",
+      "notes": ""
+    }
+  ]
+}

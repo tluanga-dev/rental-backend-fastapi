@@ -1151,6 +1151,85 @@ Create a new transaction.
 }
 ```
 
+### POST /api/transactions/new-rental
+Create a new rental transaction with simplified format. Automatically fetches rental rates from item master data.
+
+**Request Body:**
+```json
+{
+  "transaction_date": "2025-01-15",
+  "customer_id": "customer-uuid", 
+  "location_id": "location-uuid",
+  "payment_method": "CASH",
+  "payment_reference": "REF-001",
+  "notes": "5-day equipment rental",
+  "items": [
+    {
+      "item_id": "item-uuid",
+      "quantity": 1,
+      "rental_period_value": 5,
+      "tax_rate": 8.5,
+      "discount_amount": 0.00,
+      "rental_start_date": "2025-01-15",
+      "rental_end_date": "2025-01-20",
+      "notes": "Excavator rental"
+    }
+  ]
+}
+```
+
+**Key Features:**
+- Automatic rental rate lookup from item master
+- Item-level rental date management
+- Auto-generated transaction numbers (REN-YYYYMMDD-XXXX)
+- Comprehensive validation
+- Tax and discount calculations
+
+**Validation:**
+- Customer & location must exist
+- Items must be rentable
+- Dates must be valid YYYY-MM-DD format
+- End date must be after start date (per item)
+- Payment method: CASH, CARD, BANK_TRANSFER, CHECK, ONLINE
+
+**Response (201):**
+```json
+{
+  "success": true,
+  "message": "Rental transaction created successfully", 
+  "transaction_id": "new-transaction-uuid",
+  "transaction_number": "REN-20250115-1234",
+  "data": {
+    "id": "new-transaction-uuid",
+    "transaction_number": "REN-20250115-1234",
+    "transaction_type": "RENTAL",
+    "transaction_date": "2025-01-15T00:00:00Z",
+    "customer_id": "customer-uuid",
+    "location_id": "location-uuid", 
+    "status": "CONFIRMED",
+    "payment_status": "PENDING",
+    "payment_method": "CASH",
+    "total_amount": 2250.00,
+    "transaction_lines": [
+      {
+        "item_id": "item-uuid",
+        "quantity": 1.0,
+        "unit_price": 450.00,
+        "rental_period_value": 5,
+        "rental_period_unit": "DAYS",
+        "rental_start_date": "2025-01-15",
+        "rental_end_date": "2025-01-20",
+        "line_total": 2250.00
+      }
+    ]
+  }
+}
+```
+
+**Error Responses:**
+- `404`: Customer, location, or item not found
+- `422`: Invalid data format or validation failed
+
 ---
 
 ## Rental Operations

@@ -24,6 +24,7 @@ from app.modules.transactions.schemas import (
     TransactionHeaderUpdate,
     TransactionHeaderResponse,
     TransactionHeaderListResponse,
+    TransactionHeaderWithLinesListResponse,
     TransactionWithLinesResponse,
     TransactionLineCreate,
     TransactionLineUpdate,
@@ -39,11 +40,13 @@ from app.modules.transactions.schemas import (
     TransactionSummary,
     TransactionReport,
     TransactionSearch,
-    PurchaseCreate,
     PurchaseResponse,
     PurchaseItemCreate,
     NewPurchaseRequest,
     NewPurchaseResponse,
+    RentalItemCreate,
+    NewRentalRequest,
+    NewRentalResponse,
 )
 from app.modules.customers.repository import CustomerRepository
 from app.modules.inventory.repository import ItemRepository, InventoryUnitRepository
@@ -126,9 +129,9 @@ class TransactionService:
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
         active_only: bool = True,
-    ) -> List[TransactionHeaderListResponse]:
-        """Get all transactions with optional filtering."""
-        transactions = await self.transaction_repository.get_all(
+    ) -> List[TransactionHeaderWithLinesListResponse]:
+        """Get all transactions with optional filtering and nested line items."""
+        transactions = await self.transaction_repository.get_all_with_lines(
             skip=skip,
             limit=limit,
             transaction_type=transaction_type,
@@ -143,7 +146,7 @@ class TransactionService:
         )
 
         return [
-            TransactionHeaderListResponse.model_validate(transaction)
+            TransactionHeaderWithLinesListResponse.model_validate(transaction)
             for transaction in transactions
         ]
 
@@ -641,6 +644,233 @@ class TransactionService:
             if not inventory_unit.is_available():
                 raise ValidationError("Inventory unit is not available")
 
+    async def get_purchase_transactions(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        amount_from: Optional[Decimal] = None,
+        amount_to: Optional[Decimal] = None,
+        supplier_id: Optional[UUID] = None,
+        status: Optional[TransactionStatus] = None,
+        payment_status: Optional[PaymentStatus] = None,
+    ) -> List[PurchaseResponse]:
+        """Get purchase transactions with filtering options."""
+        # Use existing method but filter for purchase type
+        transactions = await self.transaction_repository.get_all_with_lines(
+            skip=skip,
+            limit=limit,
+            transaction_type=TransactionType.PURCHASE,
+            customer_id=supplier_id,  # In purchases, supplier_id is stored in customer_id
+            date_from=date_from,
+            date_to=date_to,
+            status=status,
+            payment_status=payment_status,
+            active_only=True,
+        )
+
+        # Apply amount filtering if specified
+        filtered_transactions = []
+        for transaction in transactions:
+            if amount_from and transaction.total_amount < amount_from:
+                continue
+            if amount_to and transaction.total_amount > amount_to:
+                continue
+            filtered_transactions.append(transaction)
+
+        # Collect unique supplier, location, and item IDs to fetch details
+        supplier_ids = set()
+        location_ids = set()
+        item_ids = set()
+        
+        for transaction in filtered_transactions:
+            supplier_ids.add(transaction.customer_id)  # supplier_id stored in customer_id
+            location_ids.add(transaction.location_id)
+            for line in transaction.transaction_lines:
+                if line.item_id:
+                    item_ids.add(line.item_id)
+        
+        # Fetch supplier details
+        suppliers_dict = {}
+        if supplier_ids:
+            from app.modules.suppliers.repository import SupplierRepository
+            supplier_repo = SupplierRepository(self.session)
+            for supplier_id in supplier_ids:
+                supplier = await supplier_repo.get_by_id(supplier_id)
+                if supplier:
+                    suppliers_dict[str(supplier_id)] = {
+                        "id": supplier.id,
+                        "name": supplier.company_name
+                    }
+        
+        # Fetch location details
+        locations_dict = {}
+        if location_ids:
+            from app.modules.master_data.locations.repository import LocationRepository
+            location_repo = LocationRepository(self.session)
+            for location_id in location_ids:
+                location = await location_repo.get_by_id(location_id)
+                if location:
+                    locations_dict[str(location_id)] = {
+                        "id": location.id,
+                        "name": location.location_name
+                    }
+        
+        # Fetch item details
+        items_dict = {}
+        if item_ids:
+            from app.modules.master_data.item_master.repository import ItemMasterRepository
+            item_repo = ItemMasterRepository(self.session)
+            for item_id in item_ids:
+                item = await item_repo.get_by_id(item_id)
+                if item:
+                    items_dict[str(item_id)] = {
+                        "id": item.id,
+                        "name": item.item_name
+                    }
+        
+        # Transform to PurchaseResponse format
+        purchase_responses = []
+        for transaction in filtered_transactions:
+            # Convert SQLAlchemy model to dict
+            transaction_lines_dict = []
+            for line in transaction.transaction_lines:
+                line_dict = {
+                    "id": line.id,
+                    "item_id": line.item_id,
+                    "description": line.description,
+                    "quantity": line.quantity,
+                    "unit_price": line.unit_price,
+                    "tax_rate": line.tax_rate,
+                    "discount_amount": line.discount_amount,
+                    "tax_amount": line.tax_amount,
+                    "line_total": line.line_total,
+                    "notes": line.notes,
+                    "created_at": line.created_at,
+                    "updated_at": line.updated_at,
+                }
+                transaction_lines_dict.append(line_dict)
+            
+            transaction_dict = {
+                "id": transaction.id,
+                "customer_id": transaction.customer_id,  # This contains supplier_id
+                "location_id": transaction.location_id,
+                "transaction_number": transaction.transaction_number,
+                "transaction_date": transaction.transaction_date,
+                "notes": transaction.notes,
+                "subtotal": transaction.subtotal,
+                "tax_amount": transaction.tax_amount,
+                "discount_amount": transaction.discount_amount,
+                "total_amount": transaction.total_amount,
+                "status": transaction.status,
+                "payment_status": transaction.payment_status,
+                "created_at": transaction.created_at,
+                "updated_at": transaction.updated_at,
+                "transaction_lines": transaction_lines_dict,
+            }
+            
+            # Get related details
+            supplier_details = suppliers_dict.get(str(transaction.customer_id))
+            location_details = locations_dict.get(str(transaction.location_id))
+            
+            purchase_responses.append(PurchaseResponse.from_transaction(
+                transaction_dict, 
+                supplier_details, 
+                location_details, 
+                items_dict
+            ))
+
+        return purchase_responses
+
+    async def get_purchase_by_id(self, purchase_id: UUID) -> PurchaseResponse:
+        """Get a single purchase transaction by ID."""
+        # Get transaction with lines
+        transaction = await self.transaction_repository.get_with_lines(purchase_id)
+        if not transaction:
+            raise NotFoundError(f"Purchase transaction with ID {purchase_id} not found")
+        
+        # Verify it's a purchase transaction
+        if transaction.transaction_type != TransactionType.PURCHASE.value:
+            raise ValidationError(f"Transaction {purchase_id} is not a purchase transaction")
+        
+        # Fetch supplier details
+        supplier_details = None
+        if transaction.customer_id:
+            from app.modules.suppliers.repository import SupplierRepository
+            supplier_repo = SupplierRepository(self.session)
+            supplier = await supplier_repo.get_by_id(transaction.customer_id)
+            if supplier:
+                supplier_details = {
+                    "id": supplier.id,
+                    "name": supplier.company_name
+                }
+        
+        # Fetch location details
+        location_details = None
+        if transaction.location_id:
+            from app.modules.master_data.locations.repository import LocationRepository
+            location_repo = LocationRepository(self.session)
+            location = await location_repo.get_by_id(transaction.location_id)
+            if location:
+                location_details = {
+                    "id": location.id,
+                    "name": location.location_name
+                }
+        
+        # Fetch item details
+        items_dict = {}
+        item_ids = {line.item_id for line in transaction.transaction_lines if line.item_id}
+        if item_ids:
+            from app.modules.master_data.item_master.repository import ItemMasterRepository
+            item_repo = ItemMasterRepository(self.session)
+            for item_id in item_ids:
+                item = await item_repo.get_by_id(item_id)
+                if item:
+                    items_dict[str(item_id)] = {
+                        "id": item.id,
+                        "name": item.item_name
+                    }
+        
+        # Convert SQLAlchemy model to dict
+        transaction_lines_dict = []
+        for line in transaction.transaction_lines:
+            line_dict = {
+                "id": line.id,
+                "item_id": line.item_id,
+                "description": line.description,
+                "quantity": line.quantity,
+                "unit_price": line.unit_price,
+                "tax_rate": line.tax_rate,
+                "discount_amount": line.discount_amount,
+                "tax_amount": line.tax_amount,
+                "line_total": line.line_total,
+                "notes": line.notes,
+                "created_at": line.created_at,
+                "updated_at": line.updated_at,
+            }
+            transaction_lines_dict.append(line_dict)
+        
+        transaction_dict = {
+            "id": transaction.id,
+            "customer_id": transaction.customer_id,  # This contains supplier_id
+            "location_id": transaction.location_id,
+            "transaction_number": transaction.transaction_number,
+            "transaction_date": transaction.transaction_date,
+            "notes": transaction.notes,
+            "subtotal": transaction.subtotal,
+            "tax_amount": transaction.tax_amount,
+            "discount_amount": transaction.discount_amount,
+            "total_amount": transaction.total_amount,
+            "status": transaction.status,
+            "payment_status": transaction.payment_status,
+            "created_at": transaction.created_at,
+            "updated_at": transaction.updated_at,
+            "transaction_lines": transaction_lines_dict,
+        }
+        
+        return PurchaseResponse.from_transaction(transaction_dict, supplier_details, location_details, items_dict)
+
     async def create_new_purchase(self, purchase_data: NewPurchaseRequest) -> NewPurchaseResponse:
         """Create a new purchase transaction using the new-purchase endpoint format."""
         try:
@@ -753,6 +983,142 @@ class TransactionService:
             return NewPurchaseResponse(
                 success=True,
                 message="Purchase transaction created successfully",
+                data=result.model_dump(),
+                transaction_id=transaction.id,
+                transaction_number=transaction.transaction_number,
+            )
+
+        except Exception as e:
+            await self.session.rollback()
+            raise e
+
+    async def create_new_rental(self, rental_data: NewRentalRequest) -> NewRentalResponse:
+        """Create a new rental transaction using the new-rental endpoint format."""
+        try:
+            # Validate customer exists
+            customer = await self.customer_repository.get_by_id(rental_data.customer_id)
+            if not customer:
+                raise NotFoundError(f"Customer with ID {rental_data.customer_id} not found")
+
+            # Verify customer can transact
+            if not customer.can_transact():
+                raise ValidationError("Customer cannot transact due to blacklist status")
+
+            # Validate location exists
+            from app.modules.master_data.locations.repository import LocationRepository
+            location_repo = LocationRepository(self.session)
+            location = await location_repo.get_by_id(rental_data.location_id)
+            if not location:
+                raise NotFoundError(f"Location with ID {rental_data.location_id} not found")
+
+            # Validate all items exist and are rentable
+            from app.modules.master_data.item_master.repository import ItemMasterRepository
+            item_repo = ItemMasterRepository(self.session)
+            for item in rental_data.items:
+                item_exists = await item_repo.get_by_id(item.item_id)
+                if not item_exists:
+                    raise NotFoundError(f"Item with ID {item.item_id} not found")
+                if not item_exists.is_rentable:
+                    raise ValidationError(f"Item {item.item_id} is not available for rental")
+
+            # Generate unique transaction number
+            import random
+            transaction_number = (
+                f"REN-{rental_data.transaction_date.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+            )
+
+            # Ensure uniqueness
+            while await self.transaction_repository.get_by_number(transaction_number):
+                transaction_number = f"REN-{rental_data.transaction_date.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+
+            # Create transaction header (no rental dates at header level in new structure)
+            transaction = TransactionHeader(
+                transaction_number=transaction_number,
+                transaction_type=TransactionType.RENTAL,
+                transaction_date=datetime.combine(rental_data.transaction_date, datetime.min.time()),
+                customer_id=str(rental_data.customer_id),
+                location_id=str(rental_data.location_id),
+                status=TransactionStatus.CONFIRMED,
+                payment_status=PaymentStatus.PENDING,
+                payment_method=PaymentMethod(rental_data.payment_method),
+                payment_reference=rental_data.payment_reference or "",
+                notes=rental_data.notes or "",
+                subtotal=Decimal("0"),
+                discount_amount=Decimal("0"),
+                tax_amount=Decimal("0"),
+                total_amount=Decimal("0"),
+                paid_amount=Decimal("0"),
+                deposit_amount=Decimal("0"),
+            )
+
+            # Add transaction to session
+            self.session.add(transaction)
+            await self.session.flush()  # Get the ID without committing
+
+            # Create transaction lines
+            total_amount = Decimal("0")
+            tax_total = Decimal("0")
+            discount_total = Decimal("0")
+
+            for idx, item in enumerate(rental_data.items):
+                # Get item details to fetch rental rate
+                item_details = await item_repo.get_by_id(item.item_id)
+                if not item_details:
+                    raise NotFoundError(f"Item with ID {item.item_id} not found")
+                
+                # Use item's rental rate as unit price (assuming daily rate)
+                unit_price = item_details.rental_rate_per_period or Decimal("0")
+                
+                # Calculate line values based on quantity and rental period
+                line_subtotal = unit_price * Decimal(str(item.quantity)) * Decimal(str(item.rental_period_value))
+                tax_amount = (line_subtotal * (item.tax_rate or Decimal("0"))) / 100
+                discount_amount = item.discount_amount or Decimal("0")
+                line_total = line_subtotal + tax_amount - discount_amount
+
+                # Default to DAYS for rental period unit since it's not provided in new structure
+                rental_period_unit = RentalPeriodUnit.DAYS
+
+                # Create transaction line
+                line = TransactionLine(
+                    transaction_id=str(transaction.id),
+                    line_number=idx + 1,
+                    line_type=LineItemType.PRODUCT,
+                    item_id=item.item_id,
+                    description=f"Rental: {item.item_id} ({item.rental_period_value} days)",
+                    quantity=Decimal(str(item.quantity)),
+                    unit_price=unit_price,
+                    tax_rate=item.tax_rate or Decimal("0"),
+                    tax_amount=tax_amount,
+                    discount_amount=discount_amount,
+                    line_total=line_total,
+                    rental_period_value=item.rental_period_value,
+                    rental_period_unit=rental_period_unit,
+                    rental_start_date=item.rental_start_date,
+                    rental_end_date=item.rental_end_date,
+                    notes=item.notes or "",
+                )
+
+                self.session.add(line)
+                total_amount += line_total
+                tax_total += tax_amount
+                discount_total += discount_amount
+
+            # Update transaction totals
+            transaction.subtotal = total_amount - tax_total + discount_total
+            transaction.tax_amount = tax_total
+            transaction.discount_amount = discount_total
+            transaction.total_amount = total_amount
+
+            # Commit transaction
+            await self.session.commit()
+            await self.session.refresh(transaction)
+
+            # Get the complete transaction with lines for response
+            result = await self.get_transaction_with_lines(transaction.id)
+
+            return NewRentalResponse(
+                success=True,
+                message="Rental transaction created successfully",
                 data=result.model_dump(),
                 transaction_id=transaction.id,
                 transaction_number=transaction.transaction_number,

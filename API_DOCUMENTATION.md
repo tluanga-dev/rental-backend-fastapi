@@ -712,6 +712,244 @@ Content-Type: application/json
 }
 ```
 
+### 5. Create New Rental Transaction
+**POST** `/api/transactions/new-rental`
+
+**Description:** Create a new rental transaction with a simplified format that matches the frontend JSON structure exactly. The endpoint automatically fetches rental rates from item master data and calculates totals based on quantity and rental period.
+
+**Request Body:**
+```json
+{
+  "transaction_date": "2024-01-15",
+  "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+  "location_id": "550e8400-e29b-41d4-a716-446655440002",
+  "payment_method": "CASH",
+  "payment_reference": "REF-2024-001",
+  "notes": "Five-day excavator rental for construction project",
+  "items": [
+    {
+      "item_id": "550e8400-e29b-41d4-a716-446655440003",
+      "quantity": 1,
+      "rental_period_value": 5,
+      "tax_rate": 8.5,
+      "discount_amount": 0.00,
+      "rental_start_date": "2024-01-15",
+      "rental_end_date": "2024-01-20",
+      "notes": "Caterpillar 320D excavator"
+    }
+  ]
+}
+```
+
+**Request Fields:**
+- `transaction_date`: string (YYYY-MM-DD, required) - Transaction date used for transaction number generation
+- `customer_id`: string (UUID, required) - Customer ID (must exist and be able to transact)
+- `location_id`: string (UUID, required) - Location ID where rental originates (must exist)
+- `payment_method`: string (required) - Payment method (CASH, CARD, BANK_TRANSFER, CHECK, ONLINE)
+- `payment_reference`: string (optional) - Payment reference number or transaction ID
+- `notes`: string (optional) - Additional notes for the rental transaction
+- `items`: array (required, min 1) - Array of rental items
+
+**Item Fields:**
+- `item_id`: string (UUID, required) - Item ID (must exist and be rentable)
+- `quantity`: integer (required, ≥0) - Quantity to rent (0 allowed for reservations)
+- `rental_period_value`: integer (required, ≥0) - Rental period in days (0 allowed for immediate returns)
+- `tax_rate`: decimal (optional, 0-100) - Tax rate percentage (default: 0)
+- `discount_amount`: decimal (optional, ≥0) - Fixed discount amount (default: 0)
+- `rental_start_date`: string (YYYY-MM-DD, required) - Item-specific rental start date
+- `rental_end_date`: string (YYYY-MM-DD, required) - Item-specific rental end date (must be after start date)
+- `notes`: string (optional) - Additional notes for this specific item
+
+**Key Features:**
+- Automatic rental rate lookup from item master data
+- Item-level rental date management (different items can have different rental periods)
+- Automatic transaction number generation (format: REN-YYYYMMDD-XXXX)
+- Tax and discount calculations per line item
+- Comprehensive validation at both header and line levels
+
+**Response (201):**
+```json
+{
+  "success": true,
+  "message": "Rental transaction created successfully",
+  "transaction_id": "550e8400-e29b-41d4-a716-446655440000",
+  "transaction_number": "REN-20240115-1234",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "transaction_number": "REN-20240115-1234",
+    "transaction_type": "RENTAL",
+    "transaction_date": "2024-01-15T00:00:00Z",
+    "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+    "location_id": "550e8400-e29b-41d4-a716-446655440002",
+    "status": "CONFIRMED",
+    "payment_status": "PENDING",
+    "subtotal": 2062.50,
+    "discount_amount": 0.00,
+    "tax_amount": 187.50,
+    "total_amount": 2250.00,
+    "paid_amount": 0.00,
+    "deposit_amount": 0.00,
+    "payment_method": "CASH",
+    "payment_reference": "REF-2024-001",
+    "notes": "Five-day excavator rental for construction project",
+    "transaction_lines": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440010",
+        "transaction_id": "550e8400-e29b-41d4-a716-446655440000",
+        "line_number": 1,
+        "line_type": "PRODUCT",
+        "item_id": "550e8400-e29b-41d4-a716-446655440003",
+        "description": "Rental: 550e8400-e29b-41d4-a716-446655440003 (5 days)",
+        "quantity": 1.0,
+        "unit_price": 450.00,
+        "discount_amount": 0.00,
+        "tax_rate": 8.5,
+        "tax_amount": 187.50,
+        "line_total": 2250.00,
+        "rental_period_value": 5,
+        "rental_period_unit": "DAYS",
+        "rental_start_date": "2024-01-15",
+        "rental_end_date": "2024-01-20",
+        "notes": "Caterpillar 320D excavator"
+      }
+    ],
+    "created_at": "2024-01-15T10:00:00Z",
+    "updated_at": "2024-01-15T10:00:00Z"
+  }
+}
+```
+
+**Response Fields:**
+- `success`: boolean - Operation success status (always true for 201 responses)
+- `message`: string - Human-readable success message
+- `transaction_id`: UUID - Created transaction ID for reference
+- `transaction_number`: string - Generated transaction number (REN-YYYYMMDD-XXXX format)
+- `data`: object - Complete transaction object with all details and line items
+
+**Business Logic:**
+- Unit prices are automatically fetched from item master data (`rental_rate_per_period`)
+- Line totals calculated as: `(unit_price * quantity * rental_period_value) + tax_amount - discount_amount`
+- Tax amount calculated as: `(subtotal * tax_rate) / 100`
+- Transaction totals are sum of all line totals
+- All monetary values are in decimal format with 2 decimal places
+
+**Validation Rules:**
+
+**Header Level:**
+- `transaction_date`: Must be valid YYYY-MM-DD format
+- `customer_id`: Must be valid UUID format and customer must exist and be able to transact (not blacklisted)
+- `location_id`: Must be valid UUID format and location must exist
+- `payment_method`: Must be one of: CASH, CARD, BANK_TRANSFER, CHECK, ONLINE
+- `items`: Array must contain at least 1 item
+
+**Item Level:**
+- `item_id`: Must be valid UUID format, item must exist and be rentable (`is_rentable: true`)
+- `quantity`: Must be integer >= 0 (0 allowed for reservations)
+- `rental_period_value`: Must be integer >= 0 (0 allowed for immediate returns)
+- `tax_rate`: Must be decimal between 0-100 (if provided)
+- `discount_amount`: Must be decimal >= 0 (if provided)
+- `rental_start_date`: Must be valid YYYY-MM-DD format
+- `rental_end_date`: Must be valid YYYY-MM-DD format and after start date
+- Date range validation performed per item independently
+
+**Error Responses:**
+
+**404 Not Found**
+```json
+{
+  "detail": "Customer with ID 550e8400-e29b-41d4-a716-446655440001 not found"
+}
+```
+
+**422 Validation Error**
+```json
+{
+  "detail": [
+    {
+      "type": "value_error",
+      "loc": ["body", "customer_id"],
+      "msg": "Value error, Invalid UUID format: invalid-uuid",
+      "input": "invalid-uuid"
+    },
+    {
+      "type": "value_error", 
+      "loc": ["body", "items", 0],
+      "msg": "Value error, Rental end date must be after start date",
+      "input": {...}
+    }
+  ]
+}
+```
+
+**Generated Transaction Numbers:**
+- Format: `REN-YYYYMMDD-XXXX`
+- Example: `REN-20240115-1234`
+- Based on transaction date with random 4-digit suffix
+- Automatically ensures uniqueness across all rental transactions
+
+**Usage Examples:**
+
+**Single Item Rental:**
+```bash
+curl -X POST "http://localhost:8000/api/transactions/new-rental" \
+-H "Content-Type: application/json" \
+-H "Authorization: Bearer <token>" \
+-d '{
+  "transaction_date": "2024-01-15",
+  "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+  "location_id": "550e8400-e29b-41d4-a716-446655440002",
+  "payment_method": "CASH",
+  "payment_reference": "CASH-001",
+  "notes": "Construction equipment rental",
+  "items": [
+    {
+      "item_id": "550e8400-e29b-41d4-a716-446655440003",
+      "quantity": 1,
+      "rental_period_value": 7,
+      "tax_rate": 10.0,
+      "discount_amount": 50.00,
+      "rental_start_date": "2024-01-15",
+      "rental_end_date": "2024-01-22",
+      "notes": "Weekly excavator rental with discount"
+    }
+  ]
+}'
+```
+
+**Multiple Items with Different Rental Periods:**
+```json
+{
+  "transaction_date": "2024-01-15",
+  "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+  "location_id": "550e8400-e29b-41d4-a716-446655440002",
+  "payment_method": "CARD",
+  "payment_reference": "CC-123456",
+  "notes": "Multi-equipment rental for construction project",
+  "items": [
+    {
+      "item_id": "550e8400-e29b-41d4-a716-446655440003",
+      "quantity": 1,
+      "rental_period_value": 7,
+      "tax_rate": 8.5,
+      "discount_amount": 0.00,
+      "rental_start_date": "2024-01-15",
+      "rental_end_date": "2024-01-22",
+      "notes": "Excavator for foundation work"
+    },
+    {
+      "item_id": "550e8400-e29b-41d4-a716-446655440004",
+      "quantity": 2,
+      "rental_period_value": 3,
+      "tax_rate": 8.5,
+      "discount_amount": 25.00,
+      "rental_start_date": "2024-01-16",
+      "rental_end_date": "2024-01-19",
+      "notes": "Two generators for temporary power"
+    }
+  ]
+}
+```
+
 ## Analytics Endpoints
 
 ### 1. Get Revenue Analytics
