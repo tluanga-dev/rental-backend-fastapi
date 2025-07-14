@@ -5,35 +5,44 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator, computed_fie
 from uuid import UUID
 
 from app.modules.transactions.models import (
-    TransactionType, TransactionStatus, PaymentMethod, PaymentStatus,
-    RentalPeriodUnit, LineItemType
+    TransactionType,
+    TransactionStatus,
+    PaymentMethod,
+    PaymentStatus,
+    RentalPeriodUnit,
+    LineItemType,
 )
 
 
 class TransactionHeaderCreate(BaseModel):
     """Schema for creating a new transaction header."""
+
     transaction_number: str = Field(..., max_length=50, description="Unique transaction number")
     transaction_type: TransactionType = Field(..., description="Transaction type")
     transaction_date: datetime = Field(..., description="Transaction date")
     customer_id: UUID = Field(..., description="Customer ID")
     location_id: UUID = Field(..., description="Location ID")
     sales_person_id: Optional[UUID] = Field(None, description="Sales person ID")
-    status: TransactionStatus = Field(default=TransactionStatus.DRAFT, description="Transaction status")
-    payment_status: PaymentStatus = Field(default=PaymentStatus.PENDING, description="Payment status")
+    status: TransactionStatus = Field(
+        default=TransactionStatus.DRAFT, description="Transaction status"
+    )
+    payment_status: PaymentStatus = Field(
+        default=PaymentStatus.PENDING, description="Payment status"
+    )
     reference_transaction_id: Optional[UUID] = Field(None, description="Reference transaction ID")
     rental_start_date: Optional[date] = Field(None, description="Rental start date")
     rental_end_date: Optional[date] = Field(None, description="Rental end date")
     notes: Optional[str] = Field(None, description="Additional notes")
-    
-    @field_validator('rental_end_date')
+
+    @field_validator("rental_end_date")
     @classmethod
     def validate_rental_end_date(cls, v, info):
-        if v is not None and info.data.get('rental_start_date') is not None:
-            if v < info.data.get('rental_start_date'):
+        if v is not None and info.data.get("rental_start_date") is not None:
+            if v < info.data.get("rental_start_date"):
                 raise ValueError("Rental end date must be after start date")
         return v
-    
-    @model_validator(mode='after')
+
+    @model_validator(mode="after")
     def validate_rental_dates_for_rental_type(self):
         if self.transaction_type == TransactionType.RENTAL:
             if not self.rental_start_date:
@@ -45,6 +54,7 @@ class TransactionHeaderCreate(BaseModel):
 
 class TransactionHeaderUpdate(BaseModel):
     """Schema for updating a transaction header."""
+
     transaction_type: Optional[TransactionType] = Field(None, description="Transaction type")
     transaction_date: Optional[datetime] = Field(None, description="Transaction date")
     customer_id: Optional[UUID] = Field(None, description="Customer ID")
@@ -56,20 +66,21 @@ class TransactionHeaderUpdate(BaseModel):
     rental_start_date: Optional[date] = Field(None, description="Rental start date")
     rental_end_date: Optional[date] = Field(None, description="Rental end date")
     notes: Optional[str] = Field(None, description="Additional notes")
-    
-    @field_validator('rental_end_date')
+
+    @field_validator("rental_end_date")
     @classmethod
     def validate_rental_end_date(cls, v, info):
-        if v is not None and info.data.get('rental_start_date') is not None:
-            if v < info.data.get('rental_start_date'):
+        if v is not None and info.data.get("rental_start_date") is not None:
+            if v < info.data.get("rental_start_date"):
                 raise ValueError("Rental end date must be after start date")
         return v
 
 
 class TransactionHeaderResponse(BaseModel):
     """Schema for transaction header response."""
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     transaction_number: str
     transaction_type: TransactionType
@@ -95,32 +106,32 @@ class TransactionHeaderResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    
+
     @computed_field
     @property
     def display_name(self) -> str:
         return f"{self.transaction_number} - {self.transaction_type.value}"
-    
+
     @computed_field
     @property
     def balance_due(self) -> Decimal:
         return max(self.total_amount - self.paid_amount, Decimal("0.00"))
-    
+
     @computed_field
     @property
     def is_paid_in_full(self) -> bool:
         return self.paid_amount >= self.total_amount
-    
+
     @computed_field
     @property
     def is_rental(self) -> bool:
         return self.transaction_type == TransactionType.RENTAL
-    
+
     @computed_field
     @property
     def is_sale(self) -> bool:
         return self.transaction_type == TransactionType.SALE
-    
+
     @computed_field
     @property
     def rental_days(self) -> int:
@@ -131,8 +142,9 @@ class TransactionHeaderResponse(BaseModel):
 
 class TransactionHeaderListResponse(BaseModel):
     """Schema for transaction header list response."""
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     transaction_number: str
     transaction_type: TransactionType
@@ -146,12 +158,12 @@ class TransactionHeaderListResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    
+
     @computed_field
     @property
     def display_name(self) -> str:
         return f"{self.transaction_number} - {self.transaction_type.value}"
-    
+
     @computed_field
     @property
     def balance_due(self) -> Decimal:
@@ -160,6 +172,7 @@ class TransactionHeaderListResponse(BaseModel):
 
 class TransactionLineCreate(BaseModel):
     """Schema for creating a new transaction line."""
+
     line_number: int = Field(..., ge=1, description="Line number")
     line_type: LineItemType = Field(..., description="Line item type")
     description: str = Field(..., max_length=500, description="Line description")
@@ -167,7 +180,9 @@ class TransactionLineCreate(BaseModel):
     unit_price: Decimal = Field(default=Decimal("0.00"), description="Unit price")
     item_id: Optional[UUID] = Field(None, description="Item ID")
     inventory_unit_id: Optional[UUID] = Field(None, description="Inventory unit ID")
-    discount_percentage: Decimal = Field(default=Decimal("0.00"), ge=0, le=100, description="Discount percentage")
+    discount_percentage: Decimal = Field(
+        default=Decimal("0.00"), ge=0, le=100, description="Discount percentage"
+    )
     discount_amount: Decimal = Field(default=Decimal("0.00"), ge=0, description="Discount amount")
     tax_rate: Decimal = Field(default=Decimal("0.00"), ge=0, description="Tax rate")
     rental_period_value: Optional[int] = Field(None, ge=1, description="Rental period value")
@@ -175,36 +190,36 @@ class TransactionLineCreate(BaseModel):
     rental_start_date: Optional[date] = Field(None, description="Rental start date")
     rental_end_date: Optional[date] = Field(None, description="Rental end date")
     notes: Optional[str] = Field(None, description="Additional notes")
-    
-    @field_validator('item_id')
+
+    @field_validator("item_id")
     @classmethod
     def validate_item_id_for_product_service(cls, v, info):
-        line_type = info.data.get('line_type')
+        line_type = info.data.get("line_type")
         if line_type in [LineItemType.PRODUCT, LineItemType.SERVICE]:
             if not v:
                 raise ValueError(f"Item ID is required for {line_type.value} lines")
         return v
-    
-    @field_validator('rental_period_unit')
+
+    @field_validator("rental_period_unit")
     @classmethod
     def validate_rental_period_unit(cls, v, info):
-        rental_period_value = info.data.get('rental_period_value')
+        rental_period_value = info.data.get("rental_period_value")
         if rental_period_value is not None and not v:
             raise ValueError("Rental period unit is required when period value is specified")
         return v
-    
-    @field_validator('rental_end_date')
+
+    @field_validator("rental_end_date")
     @classmethod
     def validate_rental_end_date(cls, v, info):
-        if v is not None and info.data.get('rental_start_date') is not None:
-            if v < info.data.get('rental_start_date'):
+        if v is not None and info.data.get("rental_start_date") is not None:
+            if v < info.data.get("rental_start_date"):
                 raise ValueError("Rental end date must be after start date")
         return v
-    
-    @field_validator('unit_price')
+
+    @field_validator("unit_price")
     @classmethod
     def validate_unit_price(cls, v, info):
-        line_type = info.data.get('line_type')
+        line_type = info.data.get("line_type")
         if v < 0 and line_type != LineItemType.DISCOUNT:
             raise ValueError("Unit price cannot be negative except for discount lines")
         return v
@@ -212,13 +227,16 @@ class TransactionLineCreate(BaseModel):
 
 class TransactionLineUpdate(BaseModel):
     """Schema for updating a transaction line."""
+
     line_type: Optional[LineItemType] = Field(None, description="Line item type")
     description: Optional[str] = Field(None, max_length=500, description="Line description")
     quantity: Optional[Decimal] = Field(None, ge=0, description="Quantity")
     unit_price: Optional[Decimal] = Field(None, description="Unit price")
     item_id: Optional[UUID] = Field(None, description="Item ID")
     inventory_unit_id: Optional[UUID] = Field(None, description="Inventory unit ID")
-    discount_percentage: Optional[Decimal] = Field(None, ge=0, le=100, description="Discount percentage")
+    discount_percentage: Optional[Decimal] = Field(
+        None, ge=0, le=100, description="Discount percentage"
+    )
     discount_amount: Optional[Decimal] = Field(None, ge=0, description="Discount amount")
     tax_rate: Optional[Decimal] = Field(None, ge=0, description="Tax rate")
     rental_period_value: Optional[int] = Field(None, ge=1, description="Rental period value")
@@ -226,20 +244,21 @@ class TransactionLineUpdate(BaseModel):
     rental_start_date: Optional[date] = Field(None, description="Rental start date")
     rental_end_date: Optional[date] = Field(None, description="Rental end date")
     notes: Optional[str] = Field(None, description="Additional notes")
-    
-    @field_validator('rental_end_date')
+
+    @field_validator("rental_end_date")
     @classmethod
     def validate_rental_end_date(cls, v, info):
-        if v is not None and info.data.get('rental_start_date') is not None:
-            if v < info.data.get('rental_start_date'):
+        if v is not None and info.data.get("rental_start_date") is not None:
+            if v < info.data.get("rental_start_date"):
                 raise ValueError("Rental end date must be after start date")
         return v
 
 
 class TransactionLineResponse(BaseModel):
     """Schema for transaction line response."""
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     transaction_id: UUID
     line_number: int
@@ -264,50 +283,51 @@ class TransactionLineResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    
+
     @computed_field
     @property
     def display_name(self) -> str:
         return f"Line {self.line_number}: {self.description}"
-    
+
     @computed_field
     @property
     def remaining_quantity(self) -> Decimal:
         return self.quantity - self.returned_quantity
-    
+
     @computed_field
     @property
     def is_fully_returned(self) -> bool:
         return self.returned_quantity >= self.quantity
-    
+
     @computed_field
     @property
     def is_partially_returned(self) -> bool:
         return 0 < self.returned_quantity < self.quantity
-    
+
     @computed_field
     @property
     def rental_days(self) -> int:
         if not self.rental_start_date or not self.rental_end_date:
             return 0
         return (self.rental_end_date - self.rental_start_date).days + 1
-    
+
     @computed_field
     @property
     def effective_unit_price(self) -> Decimal:
         if self.quantity == 0:
             return Decimal("0.00")
-        
+
         subtotal = self.quantity * self.unit_price
         discounted_amount = subtotal - self.discount_amount
-        
+
         return discounted_amount / self.quantity
 
 
 class TransactionLineListResponse(BaseModel):
     """Schema for transaction line list response."""
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     transaction_id: UUID
     line_number: int
@@ -321,7 +341,7 @@ class TransactionLineListResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    
+
     @computed_field
     @property
     def display_name(self) -> str:
@@ -330,6 +350,7 @@ class TransactionLineListResponse(BaseModel):
 
 class PaymentCreate(BaseModel):
     """Schema for creating a payment."""
+
     amount: Decimal = Field(..., gt=0, description="Payment amount")
     payment_method: PaymentMethod = Field(..., description="Payment method")
     payment_reference: Optional[str] = Field(None, max_length=100, description="Payment reference")
@@ -338,6 +359,7 @@ class PaymentCreate(BaseModel):
 
 class RefundCreate(BaseModel):
     """Schema for creating a refund."""
+
     refund_amount: Decimal = Field(..., gt=0, description="Refund amount")
     reason: str = Field(..., max_length=500, description="Refund reason")
     notes: Optional[str] = Field(None, description="Additional notes")
@@ -345,26 +367,31 @@ class RefundCreate(BaseModel):
 
 class StatusUpdate(BaseModel):
     """Schema for updating transaction status."""
+
     status: TransactionStatus = Field(..., description="New status")
     notes: Optional[str] = Field(None, description="Status update notes")
 
 
 class DiscountApplication(BaseModel):
     """Schema for applying discount to transaction line."""
-    discount_percentage: Optional[Decimal] = Field(None, ge=0, le=100, description="Discount percentage")
+
+    discount_percentage: Optional[Decimal] = Field(
+        None, ge=0, le=100, description="Discount percentage"
+    )
     discount_amount: Optional[Decimal] = Field(None, ge=0, description="Discount amount")
     reason: Optional[str] = Field(None, description="Discount reason")
-    
-    @field_validator('discount_percentage')
+
+    @field_validator("discount_percentage")
     @classmethod
     def validate_discount_exclusivity(cls, v, info):
-        if v is not None and info.data.get('discount_amount') is not None:
+        if v is not None and info.data.get("discount_amount") is not None:
             raise ValueError("Cannot apply both percentage and amount discount")
         return v
 
 
 class ReturnProcessing(BaseModel):
     """Schema for processing returns."""
+
     return_quantity: Decimal = Field(..., gt=0, description="Return quantity")
     return_date: date = Field(..., description="Return date")
     return_reason: Optional[str] = Field(None, description="Return reason")
@@ -373,6 +400,7 @@ class ReturnProcessing(BaseModel):
 
 class RentalPeriodUpdate(BaseModel):
     """Schema for updating rental period."""
+
     new_end_date: date = Field(..., description="New rental end date")
     reason: Optional[str] = Field(None, description="Reason for change")
     notes: Optional[str] = Field(None, description="Additional notes")
@@ -380,6 +408,7 @@ class RentalPeriodUpdate(BaseModel):
 
 class RentalReturn(BaseModel):
     """Schema for rental return."""
+
     actual_return_date: date = Field(..., description="Actual return date")
     condition_notes: Optional[str] = Field(None, description="Condition notes")
     late_fees: Optional[Decimal] = Field(None, ge=0, description="Late fees")
@@ -389,8 +418,9 @@ class RentalReturn(BaseModel):
 
 class TransactionWithLinesResponse(BaseModel):
     """Schema for transaction with lines response."""
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     transaction_number: str
     transaction_type: TransactionType
@@ -417,22 +447,22 @@ class TransactionWithLinesResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     transaction_lines: List[TransactionLineResponse] = []
-    
+
     @computed_field
     @property
     def display_name(self) -> str:
         return f"{self.transaction_number} - {self.transaction_type.value}"
-    
+
     @computed_field
     @property
     def balance_due(self) -> Decimal:
         return max(self.total_amount - self.paid_amount, Decimal("0.00"))
-    
+
     @computed_field
     @property
     def is_paid_in_full(self) -> bool:
         return self.paid_amount >= self.total_amount
-    
+
     @computed_field
     @property
     def line_count(self) -> int:
@@ -441,6 +471,7 @@ class TransactionWithLinesResponse(BaseModel):
 
 class TransactionSummary(BaseModel):
     """Schema for transaction summary."""
+
     total_transactions: int
     total_amount: Decimal
     total_paid: Decimal
@@ -452,6 +483,7 @@ class TransactionSummary(BaseModel):
 
 class TransactionReport(BaseModel):
     """Schema for transaction report."""
+
     transactions: List[TransactionHeaderListResponse]
     summary: TransactionSummary
     date_range: dict[str, date]
@@ -459,6 +491,7 @@ class TransactionReport(BaseModel):
 
 class TransactionSearch(BaseModel):
     """Schema for transaction search."""
+
     transaction_number: Optional[str] = Field(None, description="Transaction number")
     transaction_type: Optional[TransactionType] = Field(None, description="Transaction type")
     customer_id: Optional[UUID] = Field(None, description="Customer ID")
@@ -470,20 +503,20 @@ class TransactionSearch(BaseModel):
     date_to: Optional[date] = Field(None, description="Date to")
     amount_from: Optional[Decimal] = Field(None, ge=0, description="Amount from")
     amount_to: Optional[Decimal] = Field(None, ge=0, description="Amount to")
-    
-    @field_validator('date_to')
+
+    @field_validator("date_to")
     @classmethod
     def validate_date_range(cls, v, info):
-        if v is not None and info.data.get('date_from') is not None:
-            if v < info.data.get('date_from'):
+        if v is not None and info.data.get("date_from") is not None:
+            if v < info.data.get("date_from"):
                 raise ValueError("Date to must be after date from")
         return v
-    
-    @field_validator('amount_to')
+
+    @field_validator("amount_to")
     @classmethod
     def validate_amount_range(cls, v, info):
-        if v is not None and info.data.get('amount_from') is not None:
-            if v < info.data.get('amount_from'):
+        if v is not None and info.data.get("amount_from") is not None:
+            if v < info.data.get("amount_from"):
                 raise ValueError("Amount to must be greater than amount from")
         return v
 
@@ -491,35 +524,83 @@ class TransactionSearch(BaseModel):
 # Purchase-specific schemas
 class PurchaseItemCreate(BaseModel):
     """Schema for creating a purchase item."""
-    item_id: UUID = Field(..., description="Item ID")
+
+    item_id: str = Field(..., description="Item ID")
     quantity: int = Field(..., ge=1, description="Quantity")
     unit_cost: Decimal = Field(..., ge=0, description="Unit cost")
     tax_rate: Optional[Decimal] = Field(0, ge=0, le=100, description="Tax rate percentage")
     discount_amount: Optional[Decimal] = Field(0, ge=0, description="Discount amount")
     condition: str = Field(..., pattern="^[A-D]$", description="Item condition (A, B, C, or D)")
-    notes: Optional[str] = Field(None, max_length=500, description="Additional notes")
+    notes: Optional[str] = Field("", description="Additional notes")
 
 
 class PurchaseCreate(BaseModel):
     """Schema for creating a purchase transaction."""
+
     supplier_id: UUID = Field(..., description="Supplier ID")
     location_id: UUID = Field(..., description="Location ID")
     purchase_date: date = Field(..., description="Purchase date")
-    tax_amount: Optional[Decimal] = Field(0, ge=0, description="Total tax amount")
-    discount_amount: Optional[Decimal] = Field(0, ge=0, description="Total discount amount")
-    notes: Optional[str] = Field(None, description="Additional notes")
-    reference_number: Optional[str] = Field(None, max_length=50, description="Reference number")
+    notes: Optional[str] = Field("", description="Additional notes")
+    reference_number: Optional[str] = Field("", max_length=50, description="Reference number")
     items: List[PurchaseItemCreate] = Field(..., min_length=1, description="Purchase items")
+
+
+class NewPurchaseRequest(BaseModel):
+    """Schema for the new-purchase endpoint - matches frontend JSON structure exactly."""
+
+    supplier_id: str = Field(..., description="Supplier ID")
+    location_id: str = Field(..., description="Location ID")
+    purchase_date: str = Field(..., description="Purchase date in YYYY-MM-DD format")
+    notes: str = Field("", description="Additional notes")
+    reference_number: str = Field("", description="Reference number")
+    items: List[PurchaseItemCreate] = Field(..., min_length=1, description="Purchase items")
+
+    @field_validator("purchase_date")
+    @classmethod
+    def validate_purchase_date(cls, v):
+        """Validate and parse the purchase date."""
+        try:
+            from datetime import datetime
+
+            return datetime.strptime(v, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError("Invalid date format. Use YYYY-MM-DD format.")
+
+    @field_validator("supplier_id", "location_id")
+    @classmethod
+    def validate_uuids(cls, v):
+        """Validate UUID strings."""
+        try:
+            from uuid import UUID
+
+            return UUID(v)
+        except ValueError:
+            raise ValueError(f"Invalid UUID format: {v}")
+
+
+class NewPurchaseResponse(BaseModel):
+    """Schema for new-purchase response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    success: bool = Field(True, description="Operation success status")
+    message: str = Field("Purchase created successfully", description="Response message")
+    data: dict = Field(..., description="Purchase transaction data")
+    transaction_id: UUID = Field(..., description="Created transaction ID")
+    transaction_number: str = Field(..., description="Generated transaction number")
 
 
 class PurchaseResponse(BaseModel):
     """Schema for purchase response - maps transaction data to purchase format."""
+
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     supplier_id: UUID = Field(..., description="Supplier ID (mapped from customer_id)")
     purchase_date: date = Field(..., description="Purchase date (mapped from transaction_date)")
-    reference_number: Optional[str] = Field(None, description="Reference number (mapped from transaction_number)")
+    reference_number: Optional[str] = Field(
+        None, description="Reference number (mapped from transaction_number)"
+    )
     notes: Optional[str] = Field(None, description="Additional notes")
     subtotal: Decimal = Field(..., description="Subtotal amount")
     tax_amount: Decimal = Field(..., description="Tax amount")
@@ -530,14 +611,16 @@ class PurchaseResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: List[TransactionLineResponse] = Field(default_factory=list, description="Purchase items")
-    
+
     @classmethod
     def from_transaction(cls, transaction: dict) -> "PurchaseResponse":
         """Create PurchaseResponse from TransactionHeaderResponse data."""
         return cls(
             id=transaction["id"],
             supplier_id=transaction["customer_id"],  # Map customer_id to supplier_id
-            purchase_date=transaction["transaction_date"].date() if isinstance(transaction["transaction_date"], datetime) else transaction["transaction_date"],
+            purchase_date=transaction["transaction_date"].date()
+            if isinstance(transaction["transaction_date"], datetime)
+            else transaction["transaction_date"],
             reference_number=transaction.get("transaction_number"),
             notes=transaction.get("notes"),
             subtotal=transaction["subtotal"],
@@ -548,5 +631,5 @@ class PurchaseResponse(BaseModel):
             payment_status=transaction["payment_status"],
             created_at=transaction["created_at"],
             updated_at=transaction["updated_at"],
-            items=transaction.get("transaction_lines", [])
+            items=transaction.get("transaction_lines", []),
         )
