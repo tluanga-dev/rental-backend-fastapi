@@ -278,14 +278,19 @@ This log tracks the complete flow of purchase transactions and stock level integ
         self.logger.info(f"🎯 PURCHASE TRANSACTION {status} - ID: {transaction_id}")
         
         # Markdown log
+        json_block = ""
+        if response_data:
+            json_str = json.dumps(response_data, indent=2, default=str)
+            json_block = f"```json\n{json_str}\n```"
+        
         content = f"""
 ### 🎯 Purchase Transaction Completed
 **Timestamp:** {timestamp}  
 **Status:** {status}  
 **Transaction ID:** {transaction_id}
 
-{f"**Response Data:**" if response_data else ""}
-{f"```json\n{json.dumps(response_data, indent=2, default=str)}\n```" if response_data else ""}
+{"**Response Data:**" if response_data else ""}
+{json_block}
 
 ---
 

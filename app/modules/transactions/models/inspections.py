@@ -8,8 +8,7 @@ from sqlalchemy.orm import relationship
 from uuid import uuid4
 from datetime import datetime
 
-from app.db.base import BaseModel
-from app.shared.utils.types import UUIDType
+from app.db.base import BaseModel, UUIDType
 
 
 class RentalInspection(BaseModel):
@@ -19,7 +18,7 @@ class RentalInspection(BaseModel):
     
     id = Column(UUIDType(), primary_key=True, default=uuid4)
     return_id = Column(UUIDType(), ForeignKey("transaction_headers.id"), nullable=False)
-    inspector_id = Column(UUIDType(), ForeignKey("users.id"), nullable=False)
+    inspector_id = Column(UUIDType(), nullable=False)  # Removed FK constraint temporarily
     inspection_date = Column(DateTime, nullable=False, default=datetime.utcnow)
     
     # Overall assessment
@@ -42,7 +41,7 @@ class RentalInspection(BaseModel):
     
     # Relationships
     return_transaction = relationship("TransactionHeader", foreign_keys=[return_id])
-    inspector = relationship("User", foreign_keys=[inspector_id])
+    # inspector = relationship("User", foreign_keys=[inspector_id])  # Disabled temporarily
 
 
 class PurchaseCreditMemo(BaseModel):
@@ -67,8 +66,8 @@ class PurchaseCreditMemo(BaseModel):
     # Additional information
     credit_terms = Column(String(500))
     supplier_notes = Column(Text)
-    received_by = Column(UUIDType(), ForeignKey("users.id"), nullable=False)
+    received_by = Column(UUIDType(), nullable=False)  # Removed FK constraint temporarily
     
     # Relationships
     return_transaction = relationship("TransactionHeader", foreign_keys=[return_id])
-    received_by_user = relationship("User", foreign_keys=[received_by])
+    # received_by_user = relationship("User", foreign_keys=[received_by])  # Disabled temporarily

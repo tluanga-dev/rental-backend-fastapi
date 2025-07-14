@@ -11,7 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.transactions.models import TransactionHeader
 from app.modules.transactions.schemas.returns import ReturnWorkflowState
-from app.core.logger import logger
+import logging
+logger = logging.getLogger(__name__)
 
 
 class WorkflowTransition:

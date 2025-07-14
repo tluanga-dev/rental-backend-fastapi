@@ -45,7 +45,8 @@ from app.modules.transactions.services.return_processors import (
     RentalReturnProcessor
 )
 from app.core.errors import NotFoundError, ValidationError, ConflictError
-from app.core.logger import logger
+import logging
+logger = logging.getLogger(__name__)
 
 
 class UnifiedReturnService:

@@ -21,9 +21,10 @@ from app.modules.master_data.item_master.models import Item
 from app.modules.suppliers.models import Supplier
 from app.modules.customers.models import Customer
 from app.modules.inventory.models import InventoryUnit, StockLevel, SKUSequence
-from app.modules.transactions.models import TransactionHeader, TransactionLine
-from app.modules.transactions.models.metadata import TransactionMetadata
-from app.modules.transactions.models.inspections import RentalInspection, PurchaseCreditMemo
+from app.modules.transactions.models import (
+    TransactionHeader, TransactionLine, TransactionMetadata,
+    RentalInspection, PurchaseCreditMemo
+)
 from app.modules.rentals.models import RentalReturn, RentalReturnLine, InspectionReport
 from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
 from app.modules.system.models import SystemSetting, SystemBackup, AuditLog
@@ -33,8 +34,7 @@ from app.modules.master_data.routes import router as master_data_router
 from app.modules.suppliers.routes import router as suppliers_router
 from app.modules.customers.routes import router as customers_router
 from app.modules.inventory.routes import router as inventory_router
-from app.modules.transactions.routes import router as transactions_router
-from app.modules.transactions.routes.returns import router as returns_router
+from app.modules.transactions.routes import router as transactions_router, returns_router
 from app.modules.rentals.routes import router as rentals_router
 from app.modules.analytics.routes import router as analytics_router
 from app.modules.system.routes import router as system_router

@@ -9,8 +9,10 @@ from app.modules.transactions.models import (
     PaymentStatus,
     RentalPeriodUnit,
     LineItemType,
+    TransactionMetadata,
+    RentalInspection,
+    PurchaseCreditMemo,
 )
-from app.modules.transactions.models.metadata import TransactionMetadata
 
 __all__ = [
     "TransactionHeader",
@@ -22,4 +24,6 @@ __all__ = [
     "RentalPeriodUnit",
     "LineItemType",
     "TransactionMetadata",
+    "RentalInspection",
+    "PurchaseCreditMemo",
 ]

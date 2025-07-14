@@ -24,7 +24,7 @@ class TransactionHeaderCreate(BaseModel):
     location_id: UUID = Field(..., description="Location ID")
     sales_person_id: Optional[UUID] = Field(None, description="Sales person ID")
     status: TransactionStatus = Field(
-        default=TransactionStatus.DRAFT, description="Transaction status"
+        default=TransactionStatus.PENDING, description="Transaction status"
     )
     payment_status: PaymentStatus = Field(
         default=PaymentStatus.PENDING, description="Payment status"
