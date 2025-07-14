@@ -309,8 +309,7 @@ class ItemMasterRepository:
                 "model_number": item.model_number,
                 "serial_number_required": item.serial_number_required,
                 "warranty_period_days": item.warranty_period_days,
-                "reorder_level": item.reorder_level,
-                "reorder_quantity": item.reorder_quantity,
+                "reorder_point": item.reorder_point,
                 "is_rentable": item.is_rentable,
                 "is_saleable": item.is_saleable,
                 "is_active": item.is_active,
@@ -480,13 +479,12 @@ class ItemMasterRepository:
         result = await self.session.execute(query)
         return result.scalars().all()
     
-    async def get_low_stock_items(self, active_only: bool = True) -> List[Item]:
-        """Get items that need reordering based on reorder level."""
-        # This would need to be enhanced with actual stock level logic
+    async def get_low_stock_items_legacy(self, active_only: bool = True) -> List[Item]:
+        """Legacy method - use get_low_stock_items instead."""
         query = select(Item).where(
             and_(
-                Item.reorder_level != "0",
-                Item.reorder_level.isnot(None)
+                Item.reorder_point > 0,
+                Item.is_active == True
             )
         )
         
