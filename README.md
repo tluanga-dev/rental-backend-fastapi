@@ -1,6 +1,6 @@
-# FastAPI PostgreSQL Project
+# Rental Management System - Backend API
 
-A modern FastAPI application with PostgreSQL, SQLAlchemy, Alembic, and JWT authentication following Django-like modular structure.
+A comprehensive FastAPI-based rental management system with PostgreSQL, featuring integrated inventory tracking, purchase management, and automated stock level updates.
 
 ## Features
 
@@ -14,6 +14,9 @@ A modern FastAPI application with PostgreSQL, SQLAlchemy, Alembic, and JWT authe
 - **Modular Architecture**: Django-like app structure
 - **RBAC**: Role-based access control
 - **Type Safety**: Full type hints with Pydantic v2
+- **🆕 Purchase-Inventory Integration**: Automatic stock level updates on purchases
+- **🆕 Real-time Stock Tracking**: Live inventory management across locations
+- **🆕 Transaction Management**: Complete purchase and rental transaction system
 
 ## Project Structure
 
@@ -126,7 +129,204 @@ Once the server is running, visit:
 - **ReDoc**: http://localhost:8000/redoc
 - **OpenAPI JSON**: http://localhost:8000/openapi.json
 
-## Authentication
+### Core API Endpoints
+
+#### 🔐 Authentication Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/auth/register` | Register new user |
+| `POST` | `/api/auth/login` | User login |
+| `POST` | `/api/auth/refresh` | Refresh access token |
+| `POST` | `/api/auth/logout` | User logout |
+| `GET` | `/api/auth/me` | Get current user |
+
+#### 🛒 Purchase Transaction Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/transactions/purchases` | List purchase transactions |
+| `GET` | `/api/transactions/purchases/{id}` | Get specific purchase |
+| `POST` | `/api/transactions/new-purchase` | **Create new purchase (with automatic stock updates)** |
+
+#### 📦 Stock Level Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/inventory/stock` | Get all stock levels |
+| `GET` | `/api/inventory/stock/{id}` | Get specific stock level |
+| `GET` | `/api/inventory/stock/low` | Get low stock items |
+| `GET` | `/api/inventory/items/{item_id}/stock` | Get stock levels for item |
+| `GET` | `/api/inventory/items/{item_id}/stock-summary` | **Comprehensive item stock summary** |
+| `GET` | `/api/inventory/locations/{location_id}/stock` | Get stock levels by location |
+| `POST` | `/api/inventory/stock/{id}/adjust` | Adjust stock quantity |
+| `POST` | `/api/inventory/stock/{id}/reserve` | Reserve stock |
+| `POST` | `/api/inventory/stock/{id}/release` | Release stock reservation |
+
+#### 📋 Master Data Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/master/items` | List items |
+| `POST` | `/api/master/items` | Create new item |
+| `GET` | `/api/master/categories` | List categories |
+| `GET` | `/api/master/suppliers` | List suppliers |
+| `GET` | `/api/master/locations` | List locations |
+
+### 🆕 Purchase Transaction Integration
+
+#### Create Purchase with Automatic Stock Updates
+
+**Endpoint**: `POST /api/transactions/new-purchase`
+
+**Features**:
+- ✅ Creates purchase transaction
+- ✅ **Automatically updates stock levels**
+- ✅ **Creates new stock records if needed**
+- ✅ **Increments existing stock quantities**
+- ✅ Atomic database transactions
+- ✅ Complete rollback on failures
+
+**Request Example**:
+```json
+{
+  "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+  "location_id": "987fcdeb-51a2-43d1-9f4e-123456789abc",
+  "purchase_date": "2024-01-15",
+  "notes": "Monthly inventory purchase",
+  "items": [
+    {
+      "item_id": "456e7890-e89b-12d3-a456-426614174000",
+      "quantity": 10,
+      "unit_cost": 99.99,
+      "condition": "NEW",
+      "tax_rate": 8.5,
+      "discount_amount": 0,
+      "notes": "Premium quality items"
+    }
+  ]
+}
+```
+
+**Response Example**:
+```json
+{
+  "success": true,
+  "message": "Purchase transaction created successfully",
+  "transaction_id": "789e1234-e89b-12d3-a456-426614174000",
+  "transaction_number": "PUR-20240115-1234",
+  "data": {
+    "id": "789e1234-e89b-12d3-a456-426614174000",
+    "transaction_type": "PURCHASE",
+    "status": "COMPLETED",
+    "total_amount": 1089.89,
+    "transaction_lines": [...]
+  }
+}
+```
+
+### 📊 Stock Information Queries
+
+#### Get All Stock Information
+
+**Endpoint**: `GET /api/inventory/stock`
+
+**Query Parameters**:
+- `skip` (int): Pagination offset (default: 0)
+- `limit` (int): Records per page (default: 100)
+- `item_id` (UUID): Filter by item
+- `location_id` (UUID): Filter by location
+- `active_only` (bool): Show only active stock (default: true)
+
+**Examples**:
+```bash
+# Get all stock levels
+GET /api/inventory/stock
+
+# Get stock with pagination
+GET /api/inventory/stock?skip=0&limit=50
+
+# Get stock for specific item
+GET /api/inventory/stock?item_id=123e4567-e89b-12d3-a456-426614174000
+
+# Get stock at specific location
+GET /api/inventory/stock?location_id=987fcdeb-51a2-43d1-9f4e-123456789abc
+```
+
+#### Get Stock for Specific Item
+
+**Endpoint**: `GET /api/inventory/items/{item_id}/stock-summary`
+
+**Response**:
+```json
+{
+  "item_id": "123e4567-e89b-12d3-a456-426614174000",
+  "total_stock_levels": 3,
+  "total_inventory_units": 25,
+  "aggregate_quantities": {
+    "on_hand": "50",
+    "available": "45",
+    "reserved": "5"
+  },
+  "units_by_status": {
+    "AVAILABLE": 20,
+    "RENTED": 3,
+    "MAINTENANCE": 2
+  },
+  "units_by_location": {
+    "Warehouse A": 30,
+    "Warehouse B": 15,
+    "Store Front": 5
+  },
+  "stock_levels": [...],
+  "has_initial_stock": true
+}
+```
+
+### 🔄 Business Workflow Integration
+
+#### Purchase → Stock Update Flow
+
+1. **Create Purchase**: POST `/api/transactions/new-purchase`
+2. **Automatic Stock Updates**: System automatically:
+   - Validates supplier, location, and items
+   - Creates transaction header and lines
+   - **Updates stock levels for each item**:
+     - If stock exists: increments `quantity_on_hand` and `quantity_available`
+     - If no stock: creates new stock level record
+   - Commits all changes atomically
+3. **Real-time Inventory**: Stock levels immediately reflect purchase
+
+#### Stock Tracking Capabilities
+
+- **Multi-location tracking**: Separate stock levels per item per location
+- **Quantity types**: On-hand, available, reserved, on-order
+- **Reorder management**: Minimum/maximum levels, reorder points
+- **Low stock alerts**: Automatic identification of items needing reorder
+- **Stock adjustments**: Manual quantity adjustments with audit trail
+- **Reservations**: Ability to reserve and release stock for orders
+
+## 🎯 Integration Benefits
+
+### Purchase-Inventory Integration Advantages
+
+- **🔄 Automatic Updates**: Purchase transactions automatically update inventory levels
+- **📊 Real-time Tracking**: Live stock visibility across all locations
+- **🛡️ Data Consistency**: Atomic transactions ensure purchase and stock data stay synchronized
+- **🚫 Manual Elimination**: No manual stock adjustments needed after purchases
+- **⚡ Performance**: Single-transaction commits optimize database performance
+- **🔒 Error Resilience**: Complete rollback if any operation fails
+- **📍 Multi-location**: Independent stock tracking per item per location
+- **📈 Business Intelligence**: Comprehensive stock reports and analytics
+
+### Data Flow Visualization
+
+```
+Purchase Request → Validate Data → Create Transaction → Update Stock → Commit All
+     ↓               ↓                 ↓                 ↓              ↓
+   Supplier      Transaction      Transaction         Stock          Success
+   Location      Header           Lines               Levels         Response
+   Items         Created          Created             Updated/       
+                                                     Created        
+```
+
+## Authentication Examples
 
 ### Register User
 
@@ -155,6 +355,47 @@ curl -X POST "http://localhost:8000/api/auth/login" \
 
 ```bash
 curl -X GET "http://localhost:8000/api/auth/me" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### Create Purchase with Stock Updates
+
+```bash
+curl -X POST "http://localhost:8000/api/transactions/new-purchase" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+    "location_id": "987fcdeb-51a2-43d1-9f4e-123456789abc",
+    "purchase_date": "2024-01-15",
+    "notes": "Monthly inventory purchase",
+    "items": [
+      {
+        "item_id": "456e7890-e89b-12d3-a456-426614174000",
+        "quantity": 10,
+        "unit_cost": 99.99,
+        "condition": "NEW",
+        "tax_rate": 8.5,
+        "discount_amount": 0,
+        "notes": "Premium quality items"
+      }
+    ]
+  }'
+```
+
+### Get Stock Information
+
+```bash
+# Get all stock levels
+curl -X GET "http://localhost:8000/api/inventory/stock" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# Get stock for specific item
+curl -X GET "http://localhost:8000/api/inventory/items/456e7890-e89b-12d3-a456-426614174000/stock-summary" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# Get low stock items
+curl -X GET "http://localhost:8000/api/inventory/stock/low" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 

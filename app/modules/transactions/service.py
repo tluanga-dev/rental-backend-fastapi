@@ -51,6 +51,7 @@ from app.modules.transactions.schemas import (
 from app.modules.customers.repository import CustomerRepository
 from app.modules.inventory.repository import ItemRepository, InventoryUnitRepository
 from app.modules.inventory.service import InventoryService
+from app.modules.inventory.models import StockLevel
 
 
 class TransactionService:
@@ -1160,6 +1161,17 @@ class TransactionService:
                     maximum_level="0",
                     reorder_point="0"
                 )
-                # Create the stock level record directly using repository
-                await self.inventory_service.stock_level_repository.create(stock_data)
+                # Create the stock level record directly without committing
+                stock_level = StockLevel(
+                    item_id=str(stock_data.item_id),
+                    location_id=str(stock_data.location_id),
+                    quantity_on_hand=stock_data.quantity_on_hand,
+                    quantity_available=stock_data.quantity_available,
+                    quantity_reserved=stock_data.quantity_reserved,
+                    quantity_on_order=stock_data.quantity_on_order,
+                    minimum_level=stock_data.minimum_level,
+                    maximum_level=stock_data.maximum_level,
+                    reorder_point=stock_data.reorder_point
+                )
+                self.session.add(stock_level)
                 # No commit here - will be committed with the main transaction
