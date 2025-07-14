@@ -50,6 +50,7 @@ from app.modules.transactions.schemas import (
 )
 from app.modules.customers.repository import CustomerRepository
 from app.modules.inventory.repository import ItemRepository, InventoryUnitRepository
+from app.modules.inventory.service import InventoryService
 
 
 class TransactionService:
@@ -62,6 +63,7 @@ class TransactionService:
         self.customer_repository = CustomerRepository(session)
         self.item_repository = ItemRepository(session)
         self.inventory_unit_repository = InventoryUnitRepository(session)
+        self.inventory_service = InventoryService(session)
 
     # Transaction Header operations
     async def create_transaction(
@@ -973,7 +975,10 @@ class TransactionService:
             transaction.discount_amount = discount_total
             transaction.total_amount = total_amount
 
-            # Commit transaction
+            # Update stock levels for purchased items before committing
+            await self._update_stock_levels_for_purchase(purchase_data, transaction)
+
+            # Commit transaction (includes both transaction and stock level updates)
             await self.session.commit()
             await self.session.refresh(transaction)
 
@@ -1127,3 +1132,34 @@ class TransactionService:
         except Exception as e:
             await self.session.rollback()
             raise e
+
+    async def _update_stock_levels_for_purchase(self, purchase_data: NewPurchaseRequest, transaction: TransactionHeader):
+        """Update stock levels for purchased items within the same database transaction."""
+        from app.modules.inventory.schemas import StockLevelCreate
+        
+        for item in purchase_data.items:
+            # Check if stock level already exists for this item/location
+            existing_stock = await self.inventory_service.stock_level_repository.get_by_item_location(
+                item.item_id, purchase_data.location_id
+            )
+            
+            if existing_stock:
+                # Update existing stock level - increment quantities
+                existing_stock.adjust_quantity(item.quantity)
+                # No commit here - will be committed with the main transaction
+            else:
+                # Create new stock level with purchased quantity
+                stock_data = StockLevelCreate(
+                    item_id=item.item_id,
+                    location_id=purchase_data.location_id,
+                    quantity_on_hand=str(item.quantity),
+                    quantity_available=str(item.quantity),
+                    quantity_reserved="0",
+                    quantity_on_order="0",
+                    minimum_level="0",
+                    maximum_level="0",
+                    reorder_point="0"
+                )
+                # Create the stock level record directly using repository
+                await self.inventory_service.stock_level_repository.create(stock_data)
+                # No commit here - will be committed with the main transaction
