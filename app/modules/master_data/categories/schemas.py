@@ -29,6 +29,7 @@ class CategoryUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="Category name")
     display_order: Optional[int] = Field(None, ge=0, description="Display order within parent")
     is_active: Optional[bool] = Field(None, description="Category active status")
+    is_leaf: Optional[bool] = Field(None, description="Whether category is a leaf (has no children)")
     
     @validator('name')
     def validate_name(cls, v):

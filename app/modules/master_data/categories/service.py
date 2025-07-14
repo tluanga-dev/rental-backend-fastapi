@@ -176,6 +176,10 @@ class CategoryService:
         if category_data.is_active is not None:
             update_data["is_active"] = category_data.is_active
         
+        # Update leaf status
+        if category_data.is_leaf is not None:
+            update_data["is_leaf"] = category_data.is_leaf
+        
         # Update path if name changed
         if path_update_needed:
             parent_path = existing_category.get_parent_path()
