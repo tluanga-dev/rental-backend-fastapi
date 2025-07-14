@@ -151,6 +151,56 @@ async def get_item_by_sku(
         )
 
 
+# Stock alert endpoints - must come before parameterized routes
+@router.get("/low-stock", response_model=List[ItemWithInventoryResponse],
+           summary="Get Low Stock Items",
+           description="Get items with stock levels at or below their reorder point")
+async def get_low_stock_items_new(
+    skip: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of items to return"),
+    location_id: Optional[UUID] = Query(None, description="Filter by location"),
+    service: ItemMasterService = Depends(get_item_master_service)
+):
+    """
+    Get items that need reordering based on their reorder point configuration.
+    Uses efficient JOIN pattern for optimal performance.
+    """
+    try:
+        return await service.get_low_stock_items(
+            location_id=location_id,
+            skip=skip,
+            limit=limit
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Error retrieving low stock items: {str(e)}"
+        )
+
+
+@router.get("/stock-alerts/summary", 
+           summary="Get Stock Alerts Summary",
+           description="Get summary statistics for stock alerts across all items")
+async def get_stock_alerts_summary_new(
+    service: ItemMasterService = Depends(get_item_master_service)
+):
+    """
+    Get comprehensive summary of stock alert statistics including:
+    - Out of stock count
+    - Low stock count
+    - Total items
+    - Average reorder point
+    - Items needing attention
+    """
+    try:
+        return await service.get_stock_alerts_summary()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving stock alerts summary: {str(e)}"
+        )
+
+
 @router.get("/{item_id}", response_model=ItemResponse,
            summary="Get Item by ID", description="Retrieve a single item by its UUID")
 async def get_item(
@@ -363,3 +413,4 @@ async def count_items(
         active_only=active_only
     )
     return {"count": count}
+

@@ -519,3 +519,59 @@ class ItemMasterService:
         if is_saleable:
             if not sale_price:
                 raise ValidationError("Sale price is required for saleable items")
+    
+    async def get_low_stock_items(
+        self, 
+        location_id: Optional[UUID] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[ItemWithInventoryResponse]:
+        """
+        Get items with stock levels at or below their reorder point.
+        Uses efficient JOIN pattern to avoid copying reorder_point data.
+        
+        Args:
+            location_id: Optional location filter
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+            
+        Returns:
+            List of items that need reordering
+        """
+        try:
+            low_stock_items = await self.item_repository.get_low_stock_items(
+                location_id=location_id,
+                skip=skip,
+                limit=limit
+            )
+            
+            return [
+                ItemWithInventoryResponse.model_validate(item) 
+                for item in low_stock_items
+            ]
+            
+        except Exception as e:
+            self.logger.error(f"Error fetching low stock items: {str(e)}")
+            raise
+    
+    async def get_stock_alerts_summary(self) -> dict:
+        """
+        Get summary of stock alerts across all items.
+        
+        Returns:
+            Dictionary with stock alert counts and statistics
+        """
+        try:
+            summary = await self.item_repository.get_stock_alerts_summary()
+            
+            return {
+                "out_of_stock_count": summary.get("out_of_stock", 0),
+                "low_stock_count": summary.get("low_stock", 0),
+                "total_items": summary.get("total_items", 0),
+                "average_reorder_point": summary.get("avg_reorder_point", 0),
+                "items_needing_attention": summary.get("out_of_stock", 0) + summary.get("low_stock", 0)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error fetching stock alerts summary: {str(e)}")
+            raise

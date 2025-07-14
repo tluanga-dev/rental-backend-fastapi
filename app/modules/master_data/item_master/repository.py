@@ -1,7 +1,7 @@
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from decimal import Decimal
-from sqlalchemy import and_, or_, func, select, asc, case
+from sqlalchemy import and_, or_, func, select, asc, case, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -56,6 +56,9 @@ class ItemMasterRepository:
             item.reorder_level = item_data.reorder_level
         if item_data.reorder_quantity:
             item.reorder_quantity = item_data.reorder_quantity
+        
+        # Set reorder_point (mandatory field)
+        item.reorder_point = item_data.reorder_point
         
         self.session.add(item)
         await self.session.commit()
@@ -602,3 +605,89 @@ class ItemMasterRepository:
         
         result = await self.session.execute(query)
         return result.scalars().unique().all()
+    
+    async def get_low_stock_items(
+        self, 
+        location_id: Optional[UUID] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[Item]:
+        """
+        Get items with stock levels at or below their reorder point.
+        Uses efficient JOIN with StockLevel table.
+        """
+        from app.modules.inventory.models import StockLevel
+        
+        # Build query with JOIN between items and stock_levels
+        query = select(Item).join(
+            StockLevel, Item.id == StockLevel.item_id
+        ).where(
+            and_(
+                Item.is_active == True,
+                Item.reorder_point > 0,  # Only include items with configured reorder points
+                func.cast(StockLevel.quantity_available, Integer) <= Item.reorder_point
+            )
+        )
+        
+        # Add location filter if specified
+        if location_id:
+            query = query.where(StockLevel.location_id == location_id)
+        
+        # Add pagination
+        query = query.order_by(
+            # Order by urgency: out of stock first, then by how far below reorder point
+            asc(func.cast(StockLevel.quantity_available, Integer)),
+            asc(Item.item_name)
+        ).offset(skip).limit(limit)
+        
+        result = await self.session.execute(query)
+        return result.scalars().unique().all()
+    
+    async def get_stock_alerts_summary(self) -> Dict[str, Any]:
+        """
+        Get summary statistics for stock alerts.
+        """
+        from app.modules.inventory.models import StockLevel
+        
+        # Count items that are out of stock
+        out_of_stock_query = select(func.count(Item.id.distinct())).select_from(
+            Item.__table__.join(StockLevel.__table__, Item.id == StockLevel.item_id)
+        ).where(
+            and_(
+                Item.is_active == True,
+                func.cast(StockLevel.quantity_available, Integer) == 0
+            )
+        )
+        
+        # Count items that are low stock (at or below reorder point, but not zero)
+        low_stock_query = select(func.count(Item.id.distinct())).select_from(
+            Item.__table__.join(StockLevel.__table__, Item.id == StockLevel.item_id)
+        ).where(
+            and_(
+                Item.is_active == True,
+                Item.reorder_point > 0,
+                func.cast(StockLevel.quantity_available, Integer) > 0,
+                func.cast(StockLevel.quantity_available, Integer) <= Item.reorder_point
+            )
+        )
+        
+        # Count total active items
+        total_items_query = select(func.count(Item.id)).where(Item.is_active == True)
+        
+        # Average reorder point
+        avg_reorder_point_query = select(func.avg(Item.reorder_point)).where(
+            and_(Item.is_active == True, Item.reorder_point > 0)
+        )
+        
+        # Execute all queries
+        out_of_stock_result = await self.session.execute(out_of_stock_query)
+        low_stock_result = await self.session.execute(low_stock_query)
+        total_items_result = await self.session.execute(total_items_query)
+        avg_reorder_result = await self.session.execute(avg_reorder_point_query)
+        
+        return {
+            "out_of_stock": out_of_stock_result.scalar() or 0,
+            "low_stock": low_stock_result.scalar() or 0,
+            "total_items": total_items_result.scalar() or 0,
+            "avg_reorder_point": float(avg_reorder_result.scalar() or 0)
+        }

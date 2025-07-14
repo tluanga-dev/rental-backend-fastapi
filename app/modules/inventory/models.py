@@ -267,7 +267,9 @@ class StockLevel(BaseModel):
         quantity_available: Available quantity
         quantity_reserved: Reserved quantity
         quantity_on_order: Quantity on order
-        minimum_level: Minimum stock level
+        minimum_level: M
+        
+        u8o.linimum stock level
         maximum_level: Maximum stock level
         reorder_point: Reorder point
         item: Item relationship

@@ -65,6 +65,7 @@ class ItemCreate(BaseModel):
     warranty_period_days: str = Field(default="0", description="Warranty period in days")
     reorder_level: str = Field(default="0", description="Reorder level")
     reorder_quantity: str = Field(default="0", description="Reorder quantity")
+    reorder_point: int = Field(..., ge=0, description="Reorder point threshold (mandatory)")
     is_rentable: bool = Field(default=True, description="Item can be rented")
     is_saleable: bool = Field(default=False, description="Item can be sold")
 
@@ -131,6 +132,7 @@ class ItemUpdate(BaseModel):
     warranty_period_days: Optional[str] = Field(None, description="Warranty period in days")
     reorder_level: Optional[str] = Field(None, description="Reorder level")
     reorder_quantity: Optional[str] = Field(None, description="Reorder quantity")
+    reorder_point: Optional[int] = Field(None, ge=0, description="Reorder point threshold")
     is_rentable: Optional[bool] = Field(None, description="Item can be rented")
     is_saleable: Optional[bool] = Field(None, description="Item can be sold")
 
@@ -181,6 +183,7 @@ class ItemResponse(BaseModel):
     warranty_period_days: str
     reorder_level: str
     reorder_quantity: str
+    reorder_point: int
     is_rentable: bool
     is_saleable: bool
     is_active: Optional[bool] = True
@@ -254,6 +257,7 @@ class ItemWithInventoryResponse(BaseModel):
     warranty_period_days: str
     reorder_level: str
     reorder_quantity: str
+    reorder_point: int
     is_rentable: bool
     is_saleable: bool
     is_active: Optional[bool] = True
@@ -279,6 +283,21 @@ class ItemWithInventoryResponse(BaseModel):
     @property
     def is_sale_item(self) -> bool:
         return self.is_saleable
+    
+    @computed_field
+    @property
+    def stock_status(self) -> str:
+        if self.available_units == 0:
+            return "OUT_OF_STOCK"
+        elif self.available_units <= self.reorder_point:
+            return "LOW_STOCK"
+        else:
+            return "IN_STOCK"
+    
+    @computed_field
+    @property
+    def needs_reorder(self) -> bool:
+        return self.available_units <= self.reorder_point
 
 
 # New nested response schema as requested by user
@@ -314,6 +333,7 @@ class ItemNestedResponse(BaseModel):
     warranty_period_days: str = Field(default="0")
     reorder_level: str = Field(default="0")
     reorder_quantity: str = Field(default="0")
+    reorder_point: int = Field(default=0)
     is_rentable: bool = Field(default=True)
     is_saleable: bool = Field(default=False)
 
@@ -407,6 +427,7 @@ class ItemWithRelationsResponse(BaseModel):
     warranty_period_days: str
     reorder_level: str
     reorder_quantity: str
+    reorder_point: int
     is_rentable: bool
     is_saleable: bool
     is_active: Optional[bool] = True

@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Optional, TYPE_CHECKING
 from decimal import Decimal
-from sqlalchemy import Column, String, Numeric, Boolean, Text, ForeignKey, Index
+from sqlalchemy import Column, String, Numeric, Boolean, Text, ForeignKey, Index, Integer
 from sqlalchemy.orm import relationship, validates
 
 from app.db.base import BaseModel, UUIDType
@@ -77,6 +77,7 @@ class Item(BaseModel):
     warranty_period_days = Column(String(10), nullable=False, default="0", comment="Warranty period in days")
     reorder_level = Column(String(10), nullable=False, default="0", comment="Reorder level")
     reorder_quantity = Column(String(10), nullable=False, default="0", comment="Reorder quantity")
+    reorder_point = Column(Integer, nullable=False, comment="Reorder point threshold")
     is_rentable = Column(Boolean, nullable=False, default=True, comment="Item can be rented")
     is_saleable = Column(Boolean, nullable=False, default=False, comment="Item can be sold")
     
@@ -86,7 +87,7 @@ class Item(BaseModel):
     unit_of_measurement = relationship("UnitOfMeasurement", back_populates="items", lazy="select")
     inventory_units = relationship("InventoryUnit", back_populates="item", lazy="select")
     stock_levels = relationship("StockLevel", back_populates="item", lazy="select")
-    transaction_lines = relationship("TransactionLine", back_populates="item", lazy="select")
+    # transaction_lines = relationship("TransactionLine", back_populates="item", lazy="select")  # Temporarily disabled
     
     # Indexes for efficient queries
     __table_args__ = (
@@ -127,6 +128,7 @@ class Item(BaseModel):
         self.warranty_period_days = "0"
         self.reorder_level = "0"
         self.reorder_quantity = "0"
+        self.reorder_point = kwargs.get('reorder_point', 0)
         self._validate()
     
     def _validate(self):
@@ -170,6 +172,10 @@ class Item(BaseModel):
                     raise ValueError("Rental period must be a positive integer")
             except ValueError:
                 raise ValueError("Rental period must be a valid positive integer")
+        
+        # Reorder point validation
+        if hasattr(self, 'reorder_point') and self.reorder_point < 0:
+            raise ValueError("Reorder point cannot be negative")
     
     
     def is_rental_item(self) -> bool:
@@ -221,6 +227,22 @@ class Item(BaseModel):
             return 0
         from app.modules.inventory.models import InventoryUnitStatus
         return len([unit for unit in self.inventory_units if unit.status == InventoryUnitStatus.RENTED.value])
+    
+    def is_low_stock(self) -> bool:
+        """Check if item stock is below reorder point."""
+        if not hasattr(self, 'reorder_point') or self.reorder_point is None:
+            return False
+        return self.available_units <= self.reorder_point
+    
+    @property
+    def stock_status(self) -> str:
+        """Get current stock status."""
+        if self.available_units == 0:
+            return "OUT_OF_STOCK"
+        elif self.is_low_stock():
+            return "LOW_STOCK"
+        else:
+            return "IN_STOCK"
     
     def __str__(self) -> str:
         """String representation of item."""
