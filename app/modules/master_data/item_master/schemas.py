@@ -287,7 +287,8 @@ class ItemNestedResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
-    # Basic fields with SKU included
+    # Basic fields with ID and SKU included
+    id: UUID
     sku: str = Field(..., description="Stock Keeping Unit")
     item_name: str
     item_status: ItemStatus

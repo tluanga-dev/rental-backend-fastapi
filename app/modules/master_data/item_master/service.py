@@ -380,6 +380,7 @@ class ItemMasterService:
         for item in items:
             # Build nested response
             nested_item = {
+                "id": item.id,
                 "sku": item.sku,
                 "item_name": item.item_name,
                 "item_status": item.item_status,
