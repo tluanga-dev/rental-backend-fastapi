@@ -790,3 +790,173 @@ class InventoryService:
             return {"valid": False, "reason": f"Error validating unit codes: {str(e)}"}
         
         return {"valid": True, "reason": "All business rules passed"}
+    
+    # Return processing methods
+    async def adjust_stock_level(
+        self,
+        item_id: UUID,
+        location_id: UUID,
+        quantity_change: Decimal,
+        transaction_type: str,
+        reference_id: str,
+        notes: Optional[str] = None
+    ) -> StockLevelResponse:
+        """
+        Adjust stock level for return processing.
+        
+        Args:
+            item_id: Item to adjust
+            location_id: Location of the adjustment
+            quantity_change: Change in quantity (positive for additions, negative for reductions)
+            transaction_type: Type of transaction causing adjustment
+            reference_id: Reference transaction ID
+            notes: Optional notes about the adjustment
+            
+        Returns:
+            Updated stock level
+        """
+        # Get current stock level
+        stock_level = await self.stock_level_repository.get_by_item_location(
+            item_id=item_id,
+            location_id=location_id
+        )
+        
+        if not stock_level:
+            if quantity_change < 0:
+                raise ValidationError("Cannot remove from non-existent stock")
+            
+            # Create new stock level for positive adjustments
+            stock_data = StockLevelCreate(
+                item_id=item_id,
+                location_id=location_id,
+                quantity_on_hand=quantity_change,
+                quantity_available=quantity_change,
+                quantity_reserved=Decimal("0"),
+                reorder_point=Decimal("0"),
+                reorder_quantity=Decimal("0")
+            )
+            
+            stock_level = await self.stock_level_repository.create(stock_data)
+        else:
+            # Update existing stock
+            new_quantity = stock_level.quantity_on_hand + quantity_change
+            if new_quantity < 0:
+                raise ValidationError(f"Insufficient stock. Available: {stock_level.quantity_on_hand}")
+            
+            stock_level.quantity_on_hand = new_quantity
+            stock_level.quantity_available = new_quantity - stock_level.quantity_reserved
+            
+            await self.session.commit()
+            await self.session.refresh(stock_level)
+        
+        # Create stock movement record (would be implemented with a stock movement table)
+        await self._create_stock_movement_record(
+            stock_level_id=stock_level.id,
+            movement_type=transaction_type,
+            quantity=quantity_change,
+            reference_id=reference_id,
+            notes=notes
+        )
+        
+        return StockLevelResponse.model_validate(stock_level)
+    
+    async def update_inventory_unit_status(
+        self,
+        unit_id: UUID,
+        status: str,
+        condition: Optional[str] = None,
+        notes: Optional[str] = None
+    ) -> None:
+        """
+        Update inventory unit status and condition for rental returns.
+        
+        Args:
+            unit_id: Inventory unit to update
+            status: New status (AVAILABLE, REQUIRES_INSPECTION, etc.)
+            condition: New condition if applicable
+            notes: Optional notes about the update
+        """
+        unit = await self.inventory_unit_repository.get_by_id(unit_id)
+        if not unit:
+            raise NotFoundError(f"Inventory unit {unit_id} not found")
+        
+        # Update status
+        if status in [s.value for s in InventoryUnitStatus]:
+            unit.status = status
+        else:
+            raise ValidationError(f"Invalid status: {status}")
+        
+        # Update condition if provided
+        if condition and condition in [c.value for c in InventoryUnitCondition]:
+            unit.condition = condition
+        
+        # Add notes if provided
+        if notes:
+            timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            status_note = f"\n[{timestamp}] Status updated to {status}: {notes}"
+            unit.notes = (unit.notes or "") + status_note
+        
+        await self.session.commit()
+    
+    async def update_stock_condition(
+        self,
+        item_id: UUID,
+        location_id: UUID,
+        quantity: Decimal,
+        condition: str,
+        status: str
+    ) -> None:
+        """
+        Update stock condition for items without individual unit tracking.
+        
+        Args:
+            item_id: Item to update
+            location_id: Location of the stock
+            quantity: Quantity with the specified condition
+            condition: Item condition
+            status: Stock status
+        """
+        # For items without unit tracking, we would update stock level metadata
+        # This is a simplified implementation - in practice, you might have
+        # a separate table for tracking stock by condition
+        
+        stock_level = await self.stock_level_repository.get_by_item_location(
+            item_id=item_id,
+            location_id=location_id
+        )
+        
+        if not stock_level:
+            raise NotFoundError(f"Stock level not found for item {item_id} at location {location_id}")
+        
+        # Add condition tracking to notes (simplified approach)
+        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        condition_note = f"\n[{timestamp}] {quantity} units in {condition} condition, status: {status}"
+        stock_level.notes = (stock_level.notes or "") + condition_note
+        
+        await self.session.commit()
+    
+    async def _create_stock_movement_record(
+        self,
+        stock_level_id: UUID,
+        movement_type: str,
+        quantity: Decimal,
+        reference_id: str,
+        notes: Optional[str] = None
+    ) -> None:
+        """
+        Create a stock movement record for audit trail.
+        
+        In a production system, this would create records in a stock_movements table.
+        For now, this is a placeholder implementation.
+        """
+        # This would create a record in a stock_movements table
+        # For now, we'll just log the movement
+        from app.core.logger import logger
+        
+        logger.info(
+            f"Stock movement: {movement_type} - "
+            f"Stock Level: {stock_level_id}, "
+            f"Quantity: {quantity}, "
+            f"Reference: {reference_id}, "
+            f"Notes: {notes or 'None'}"
+        )

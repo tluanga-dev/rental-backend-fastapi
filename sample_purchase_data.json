@@ -1,0 +1,35 @@
+{
+  "supplier_id": "550e8400-e29b-41d4-a716-446655440001",
+  "location_id": "550e8400-e29b-41d4-a716-446655440002",
+  "purchase_date": "2024-07-14",
+  "notes": "Sample purchase transaction to test stock level integration",
+  "items": [
+    {
+      "item_id": "550e8400-e29b-41d4-a716-446655440010",
+      "quantity": 15,
+      "unit_cost": 99.99,
+      "condition": "NEW",
+      "tax_rate": 8.5,
+      "discount_amount": 0,
+      "notes": "Premium laptop computers"
+    },
+    {
+      "item_id": "550e8400-e29b-41d4-a716-446655440011",
+      "quantity": 8,
+      "unit_cost": 149.99,
+      "condition": "NEW",
+      "tax_rate": 8.5,
+      "discount_amount": 10.00,
+      "notes": "External monitors"
+    },
+    {
+      "item_id": "550e8400-e29b-41d4-a716-446655440012",
+      "quantity": 25,
+      "unit_cost": 49.99,
+      "condition": "NEW",
+      "tax_rate": 8.5,
+      "discount_amount": 0,
+      "notes": "Wireless keyboards"
+    }
+  ]
+}

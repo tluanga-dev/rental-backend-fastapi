@@ -22,6 +22,8 @@ from app.modules.suppliers.models import Supplier
 from app.modules.customers.models import Customer
 from app.modules.inventory.models import InventoryUnit, StockLevel, SKUSequence
 from app.modules.transactions.models import TransactionHeader, TransactionLine
+from app.modules.transactions.models.metadata import TransactionMetadata
+from app.modules.transactions.models.inspections import RentalInspection, PurchaseCreditMemo
 from app.modules.rentals.models import RentalReturn, RentalReturnLine, InspectionReport
 from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
 from app.modules.system.models import SystemSetting, SystemBackup, AuditLog
@@ -32,6 +34,7 @@ from app.modules.suppliers.routes import router as suppliers_router
 from app.modules.customers.routes import router as customers_router
 from app.modules.inventory.routes import router as inventory_router
 from app.modules.transactions.routes import router as transactions_router
+from app.modules.transactions.routes.returns import router as returns_router
 from app.modules.rentals.routes import router as rentals_router
 from app.modules.analytics.routes import router as analytics_router
 from app.modules.system.routes import router as system_router
@@ -80,6 +83,10 @@ app = FastAPI(
         {
             "name": "Transactions",
             "description": "Transaction management operations"
+        },
+        {
+            "name": "Returns",
+            "description": "Return transaction management (Sales, Purchase, Rental returns)"
         },
         {
             "name": "Rentals",
@@ -136,6 +143,7 @@ app.include_router(suppliers_router, prefix="/api/suppliers", tags=["Suppliers"]
 app.include_router(customers_router, prefix="/api/customers", tags=["Customers"])
 app.include_router(inventory_router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions"])
+app.include_router(returns_router, prefix="/api/transactions", tags=["Returns"])
 app.include_router(rentals_router, prefix="/api/rentals", tags=["Rentals"])
 app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(system_router, prefix="/api/system", tags=["System"])

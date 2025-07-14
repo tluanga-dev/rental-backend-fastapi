@@ -52,6 +52,7 @@ from app.modules.customers.repository import CustomerRepository
 from app.modules.inventory.repository import ItemRepository, InventoryUnitRepository
 from app.modules.inventory.service import InventoryService
 from app.modules.inventory.models import StockLevel
+from app.core.logger import get_purchase_logger
 
 
 class TransactionService:
@@ -65,6 +66,7 @@ class TransactionService:
         self.item_repository = ItemRepository(session)
         self.inventory_unit_repository = InventoryUnitRepository(session)
         self.inventory_service = InventoryService(session)
+        self.logger = get_purchase_logger()
 
     # Transaction Header operations
     async def create_transaction(
@@ -876,6 +878,10 @@ class TransactionService:
 
     async def create_new_purchase(self, purchase_data: NewPurchaseRequest) -> NewPurchaseResponse:
         """Create a new purchase transaction using the new-purchase endpoint format."""
+        
+        # Start comprehensive logging
+        self.logger.log_purchase_start(purchase_data.model_dump())
+        
         try:
             # Validate supplier exists
             from app.modules.suppliers.repository import SupplierRepository
@@ -883,7 +889,10 @@ class TransactionService:
             supplier_repo = SupplierRepository(self.session)
             supplier = await supplier_repo.get_by_id(purchase_data.supplier_id)
             if not supplier:
+                self.logger.log_validation_step("Supplier Validation", False, f"Supplier ID {purchase_data.supplier_id} not found")
                 raise NotFoundError(f"Supplier with ID {purchase_data.supplier_id} not found")
+            
+            self.logger.log_validation_step("Supplier Validation", True, f"Supplier found: {supplier.supplier_name if hasattr(supplier, 'supplier_name') else 'Unknown'}")
 
             # Validate location exists
             from app.modules.master_data.locations.repository import LocationRepository
@@ -891,16 +900,24 @@ class TransactionService:
             location_repo = LocationRepository(self.session)
             location = await location_repo.get_by_id(purchase_data.location_id)
             if not location:
+                self.logger.log_validation_step("Location Validation", False, f"Location ID {purchase_data.location_id} not found")
                 raise NotFoundError(f"Location with ID {purchase_data.location_id} not found")
+            
+            self.logger.log_validation_step("Location Validation", True, f"Location found: {location.location_name if hasattr(location, 'location_name') else 'Unknown'}")
 
             # Validate all items exist
             from app.modules.master_data.item_master.repository import ItemMasterRepository
 
             item_repo = ItemMasterRepository(self.session)
+            validated_items = []
             for item in purchase_data.items:
                 item_exists = await item_repo.get_by_id(item.item_id)
                 if not item_exists:
+                    self.logger.log_validation_step("Item Validation", False, f"Item ID {item.item_id} not found")
                     raise NotFoundError(f"Item with ID {item.item_id} not found")
+                validated_items.append(item_exists)
+            
+            self.logger.log_validation_step("Items Validation", True, f"All {len(purchase_data.items)} items validated successfully")
 
             # Generate unique transaction number
             import random
@@ -912,6 +929,8 @@ class TransactionService:
             # Ensure uniqueness
             while await self.transaction_repository.get_by_number(transaction_number):
                 transaction_number = f"PUR-{purchase_data.purchase_date.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+            
+            self.logger.log_debug_info("Generated Transaction Number", transaction_number)
 
             # Create transaction header
             transaction = TransactionHeader(
@@ -936,6 +955,16 @@ class TransactionService:
             # Add transaction to session
             self.session.add(transaction)
             await self.session.flush()  # Get the ID without committing
+            
+            # Log transaction creation
+            self.logger.log_transaction_creation({
+                "id": str(transaction.id),
+                "transaction_number": transaction.transaction_number,
+                "transaction_type": transaction.transaction_type.value,
+                "status": transaction.status.value,
+                "total_amount": str(transaction.total_amount)
+            })
+            self.logger.log_session_operation("Transaction added to session and flushed")
 
             # Create transaction lines
             total_amount = Decimal("0")
@@ -977,25 +1006,35 @@ class TransactionService:
             transaction.total_amount = total_amount
 
             # Update stock levels for purchased items before committing
+            self.logger.log_stock_level_processing_start(len(purchase_data.items))
             await self._update_stock_levels_for_purchase(purchase_data, transaction)
+            self.logger.log_session_operation("Stock level processing completed")
 
             # Commit transaction (includes both transaction and stock level updates)
+            self.logger.log_session_operation("Starting transaction commit")
             await self.session.commit()
             await self.session.refresh(transaction)
+            self.logger.log_transaction_commit(True)
 
             # Get the complete transaction with lines for response
             result = await self.get_transaction_with_lines(transaction.id)
 
-            return NewPurchaseResponse(
+            response = NewPurchaseResponse(
                 success=True,
                 message="Purchase transaction created successfully",
                 data=result.model_dump(),
                 transaction_id=transaction.id,
                 transaction_number=transaction.transaction_number,
             )
+            
+            self.logger.log_purchase_completion(True, str(transaction.id), response.model_dump())
+            return response
 
         except Exception as e:
+            self.logger.log_error(e, "Purchase Transaction Creation")
+            self.logger.log_transaction_commit(False, str(e))
             await self.session.rollback()
+            self.logger.log_session_operation("Transaction rolled back due to error")
             raise e
 
     async def create_new_rental(self, rental_data: NewRentalRequest) -> NewRentalResponse:
@@ -1139,16 +1178,41 @@ class TransactionService:
         from app.modules.inventory.schemas import StockLevelCreate
         
         for item in purchase_data.items:
+            self.logger.log_debug_info(f"Processing Item {item.item_id}", {
+                "item_id": str(item.item_id),
+                "quantity": item.quantity,
+                "location_id": str(purchase_data.location_id)
+            })
+            
             # Check if stock level already exists for this item/location
             existing_stock = await self.inventory_service.stock_level_repository.get_by_item_location(
                 item.item_id, purchase_data.location_id
             )
             
             if existing_stock:
+                # Log existing stock found
+                existing_stock_data = {
+                    "id": str(existing_stock.id),
+                    "quantity_on_hand": existing_stock.quantity_on_hand,
+                    "quantity_available": existing_stock.quantity_available,
+                    "quantity_reserved": existing_stock.quantity_reserved
+                }
+                self.logger.log_item_stock_processing(str(item.item_id), item.quantity, existing_stock_data)
+                
                 # Update existing stock level - increment quantities
+                old_quantity = existing_stock.quantity_on_hand
                 existing_stock.adjust_quantity(item.quantity)
+                self.logger.log_debug_info("Stock Quantity Adjusted", {
+                    "item_id": str(item.item_id),
+                    "old_quantity": old_quantity,
+                    "added_quantity": item.quantity,
+                    "new_quantity": existing_stock.quantity_on_hand
+                })
                 # No commit here - will be committed with the main transaction
             else:
+                # Log new stock creation
+                self.logger.log_item_stock_processing(str(item.item_id), item.quantity, None)
+                
                 # Create new stock level with purchased quantity
                 stock_data = StockLevelCreate(
                     item_id=item.item_id,
@@ -1161,6 +1225,9 @@ class TransactionService:
                     maximum_level="0",
                     reorder_point="0"
                 )
+                
+                self.logger.log_stock_level_creation(stock_data.model_dump())
+                
                 # Create the stock level record directly without committing
                 stock_level = StockLevel(
                     item_id=str(stock_data.item_id),
@@ -1174,4 +1241,5 @@ class TransactionService:
                     reorder_point=stock_data.reorder_point
                 )
                 self.session.add(stock_level)
+                self.logger.log_session_operation(f"Stock level added to session for item {item.item_id}")
                 # No commit here - will be committed with the main transaction

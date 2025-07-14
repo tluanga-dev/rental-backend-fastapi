@@ -138,6 +138,7 @@ class TransactionHeader(BaseModel):
     notes = Column(Text, nullable=True, comment="Additional notes")
     payment_method = Column(String(20), nullable=True, comment="Payment method")
     payment_reference = Column(String(100), nullable=True, comment="Payment reference")
+    return_workflow_state = Column(String(50), nullable=True, comment="Return workflow state")
     
     # Relationships
     # customer = relationship("Customer", back_populates="transactions", lazy="select")  # Temporarily disabled
@@ -146,6 +147,7 @@ class TransactionHeader(BaseModel):
     reference_transaction = relationship("TransactionHeader", remote_side="TransactionHeader.id", lazy="select")
     transaction_lines = relationship("TransactionLine", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
     rental_returns = relationship("RentalReturn", back_populates="rental_transaction", lazy="select")
+    metadata_entries = relationship("TransactionMetadata", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
     
     # Indexes for efficient queries
     __table_args__ = (
@@ -554,6 +556,9 @@ class TransactionLine(BaseModel):
     returned_quantity = Column(Numeric(10, 2), nullable=False, default=0, comment="Returned quantity")
     return_date = Column(Date, nullable=True, comment="Return date")
     notes = Column(Text, nullable=True, comment="Additional notes")
+    return_condition = Column(String(1), nullable=True, default="A", comment="Return condition (A-D)")
+    return_to_stock = Column(Boolean, nullable=True, default=True, comment="Whether to return to stock")
+    inspection_status = Column(String(20), nullable=True, comment="Inspection status for returns")
     
     # Relationships
     transaction = relationship("TransactionHeader", back_populates="transaction_lines", lazy="select")
