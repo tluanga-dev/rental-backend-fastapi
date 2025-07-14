@@ -52,10 +52,6 @@ class ItemMasterRepository:
             item.serial_number_required = item_data.serial_number_required
         if item_data.warranty_period_days:
             item.warranty_period_days = item_data.warranty_period_days
-        if item_data.reorder_level:
-            item.reorder_level = item_data.reorder_level
-        if item_data.reorder_quantity:
-            item.reorder_quantity = item_data.reorder_quantity
         
         # Set reorder_point (mandatory field)
         item.reorder_point = item_data.reorder_point

@@ -63,13 +63,11 @@ class ItemCreate(BaseModel):
     model_number: Optional[str] = Field(None, max_length=100, description="Model number")
     serial_number_required: bool = Field(default=False, description="Serial number required")
     warranty_period_days: str = Field(default="0", description="Warranty period in days")
-    reorder_level: str = Field(default="0", description="Reorder level")
-    reorder_quantity: str = Field(default="0", description="Reorder quantity")
     reorder_point: int = Field(..., ge=0, description="Reorder point threshold (mandatory)")
     is_rentable: bool = Field(default=True, description="Item can be rented")
     is_saleable: bool = Field(default=False, description="Item can be sold")
 
-    @field_validator("warranty_period_days", "reorder_level", "reorder_quantity", "rental_period")
+    @field_validator("warranty_period_days", "rental_period")
     @classmethod
     def validate_numeric_string(cls, v):
         if v is not None and v != "":
@@ -130,13 +128,11 @@ class ItemUpdate(BaseModel):
     model_number: Optional[str] = Field(None, max_length=100, description="Model number")
     serial_number_required: Optional[bool] = Field(None, description="Serial number required")
     warranty_period_days: Optional[str] = Field(None, description="Warranty period in days")
-    reorder_level: Optional[str] = Field(None, description="Reorder level")
-    reorder_quantity: Optional[str] = Field(None, description="Reorder quantity")
     reorder_point: Optional[int] = Field(None, ge=0, description="Reorder point threshold")
     is_rentable: Optional[bool] = Field(None, description="Item can be rented")
     is_saleable: Optional[bool] = Field(None, description="Item can be sold")
 
-    @field_validator("warranty_period_days", "reorder_level", "reorder_quantity", "rental_period")
+    @field_validator("warranty_period_days", "rental_period")
     @classmethod
     def validate_numeric_string(cls, v):
         if v is not None and v != "":
@@ -181,8 +177,6 @@ class ItemResponse(BaseModel):
     model_number: Optional[str]
     serial_number_required: bool
     warranty_period_days: str
-    reorder_level: str
-    reorder_quantity: str
     reorder_point: int
     is_rentable: bool
     is_saleable: bool
@@ -255,8 +249,6 @@ class ItemWithInventoryResponse(BaseModel):
     model_number: Optional[str]
     serial_number_required: bool
     warranty_period_days: str
-    reorder_level: str
-    reorder_quantity: str
     reorder_point: int
     is_rentable: bool
     is_saleable: bool
@@ -331,8 +323,6 @@ class ItemNestedResponse(BaseModel):
     model_number: Optional[str]
     serial_number_required: bool = Field(default=False)
     warranty_period_days: str = Field(default="0")
-    reorder_level: str = Field(default="0")
-    reorder_quantity: str = Field(default="0")
     reorder_point: int = Field(default=0)
     is_rentable: bool = Field(default=True)
     is_saleable: bool = Field(default=False)
@@ -425,8 +415,6 @@ class ItemWithRelationsResponse(BaseModel):
     model_number: Optional[str]
     serial_number_required: bool
     warranty_period_days: str
-    reorder_level: str
-    reorder_quantity: str
     reorder_point: int
     is_rentable: bool
     is_saleable: bool

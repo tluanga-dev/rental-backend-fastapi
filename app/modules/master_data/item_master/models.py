@@ -75,8 +75,6 @@ class Item(BaseModel):
     model_number = Column(String(100), nullable=True, comment="Model number")
     serial_number_required = Column(Boolean, nullable=False, default=False, comment="Serial number required")
     warranty_period_days = Column(String(10), nullable=False, default="0", comment="Warranty period in days")
-    reorder_level = Column(String(10), nullable=False, default="0", comment="Reorder level")
-    reorder_quantity = Column(String(10), nullable=False, default="0", comment="Reorder quantity")
     reorder_point = Column(Integer, nullable=False, comment="Reorder point threshold")
     is_rentable = Column(Boolean, nullable=False, default=True, comment="Item can be rented")
     is_saleable = Column(Boolean, nullable=False, default=False, comment="Item can be sold")
@@ -126,8 +124,6 @@ class Item(BaseModel):
         self.is_saleable = is_saleable
         self.security_deposit = Decimal("0.00")
         self.warranty_period_days = "0"
-        self.reorder_level = "0"
-        self.reorder_quantity = "0"
         self.reorder_point = kwargs.get('reorder_point', 0)
         self._validate()
     
