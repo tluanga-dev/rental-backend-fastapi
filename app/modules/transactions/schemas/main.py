@@ -27,9 +27,6 @@ class TransactionHeaderCreate(BaseModel):
     status: TransactionStatus = Field(
         default=TransactionStatus.PENDING, description="Transaction status"
     )
-    payment_status: PaymentStatus = Field(
-        default=PaymentStatus.PENDING, description="Payment status"
-    )
     reference_transaction_id: Optional[UUID] = Field(None, description="Reference transaction ID")
     notes: Optional[str] = Field(None, description="Additional notes")
 
@@ -70,7 +67,7 @@ class TransactionHeaderResponse(BaseModel):
     deposit_amount: Decimal
     reference_transaction_id: Optional[UUID]
     customer_advance_balance: Decimal
-    actual_return_date: Optional[date]
+    due_date: Optional[date]
     notes: Optional[str]
     payment_method: Optional[PaymentMethod]
     payment_reference: Optional[str]
@@ -224,7 +221,7 @@ class TransactionLineUpdate(BaseModel):
 class TransactionLineResponse(BaseModel):
     """Schema for transaction line response."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: UUID
     transaction_id: UUID
@@ -235,12 +232,12 @@ class TransactionLineResponse(BaseModel):
     description: str
     quantity: Decimal
     unit_price: Decimal
-    discount_percentage: Decimal
+    discount_percentage: Optional[Decimal] = Field(None, alias="discount_percent")
     discount_amount: Decimal
     tax_rate: Decimal
     tax_amount: Decimal
     line_total: Decimal
-    rental_period_value: Optional[int]
+    rental_period_value: Optional[int] = Field(None, alias="rental_period")
     rental_period_unit: Optional[RentalPeriodUnit]
     rental_start_date: Optional[date]
     rental_end_date: Optional[date]
@@ -406,7 +403,6 @@ class TransactionWithLinesResponse(BaseModel):
     deposit_amount: Decimal
     reference_transaction_id: Optional[UUID]
     customer_advance_balance: Decimal
-    actual_return_date: Optional[date]
     notes: Optional[str]
     payment_method: Optional[PaymentMethod]
     payment_reference: Optional[str]
@@ -458,7 +454,7 @@ class TransactionHeaderWithLinesListResponse(BaseModel):
     deposit_amount: Decimal
     reference_transaction_id: Optional[UUID]
     customer_advance_balance: Decimal
-    actual_return_date: Optional[date]
+    due_date: Optional[date]
     notes: Optional[str]
     payment_method: Optional[PaymentMethod]
     payment_reference: Optional[str]

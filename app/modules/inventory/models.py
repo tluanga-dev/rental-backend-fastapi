@@ -6,7 +6,8 @@ from sqlalchemy import Column, String, Numeric, Boolean, Text, DateTime, Foreign
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.ext.hybrid import hybrid_property
 
-from app.db.base import BaseModel, UUIDType
+from app.db.base import BaseModel, UUIDType, Base, TimestampMixin, AuditMixin
+from uuid import uuid4
 
 if TYPE_CHECKING:
     from app.modules.master_data.item_master.models import Item
@@ -532,14 +533,16 @@ class SKUSequence(BaseModel):
         )
 
 
-class StockMovement(BaseModel):
+class StockMovement(Base, TimestampMixin, AuditMixin):
     """
     Stock movement model for tracking all stock changes with audit trail.
     
     This model records every change to stock levels, including the type of movement,
     quantities before and after, and references to the triggering transactions.
+    Stock movements are immutable audit records and do not support soft deletion.
     
     Attributes:
+        id: Primary key UUID
         stock_level_id: Reference to the stock level being modified
         item_id: Item ID for efficient querying
         location_id: Location ID for efficient querying
@@ -552,16 +555,23 @@ class StockMovement(BaseModel):
         reason: Human-readable reason for the movement
         notes: Additional notes
         transaction_line_id: Optional link to specific transaction line
+        is_active: Active status (for compatibility, always True for movements)
         stock_level: Relationship to stock level
         item: Relationship to item
     """
     
     __tablename__ = "stock_movements"
     
+    # Primary key
+    id = Column(UUIDType(), primary_key=True, default=uuid4, comment="Primary key UUID")
+    
     # Core references
     stock_level_id = Column(UUIDType(), ForeignKey("stock_levels.id"), nullable=False, comment="Stock level ID")
     item_id = Column(UUIDType(), ForeignKey("items.id"), nullable=False, comment="Item ID")
     location_id = Column(UUIDType(), ForeignKey("locations.id"), nullable=False, comment="Location ID")
+    
+    # Active status for compatibility
+    is_active = Column(Boolean, nullable=False, default=True, comment="Active status")
     
     # Movement classification
     movement_type = Column(String(50), nullable=False, comment="Type of movement")

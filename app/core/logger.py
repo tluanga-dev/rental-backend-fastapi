@@ -163,7 +163,10 @@ This log tracks the complete flow of purchase transactions and stock level integ
         if existing_stock:
             action = "UPDATE EXISTING"
             old_qty = existing_stock.get('quantity_on_hand', 0)
-            new_qty = int(old_qty) + quantity if old_qty else quantity
+            # Handle string, float, Decimal, or int quantities
+            if isinstance(old_qty, str):
+                old_qty = float(old_qty) if '.' in str(old_qty) else int(old_qty)
+            new_qty = old_qty + quantity if old_qty else quantity
             
             # Console/file log
             self.logger.info(f"📈 STOCK UPDATE - Item: {item_id}, {old_qty} → {new_qty}")

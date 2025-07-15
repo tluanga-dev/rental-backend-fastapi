@@ -534,6 +534,73 @@ async def get_rental_transactions_due_for_return(
 
 # Purchase-specific endpoints (POST /purchases removed, keeping /new-purchase)
 
+@router.get("/purchase-returns/purchase/{purchase_id}")
+async def get_purchase_returns(
+    purchase_id: UUID,
+    service: TransactionService = Depends(get_transaction_service),
+):
+    """
+    Get all return transactions for a specific purchase.
+    
+    This endpoint retrieves all return transactions that reference
+    the given purchase transaction ID.
+    """
+    try:
+        # Get the original purchase transaction
+        purchase_txn = await service.get_transaction(purchase_id)
+        
+        # Handle both enum and string values
+        transaction_type_value = purchase_txn.transaction_type
+        if hasattr(transaction_type_value, 'value'):
+            transaction_type_value = transaction_type_value.value
+            
+        if transaction_type_value != "PURCHASE":
+            raise ValidationError(f"Transaction {purchase_id} is not a purchase transaction")
+        
+        # Get all return transactions that reference this purchase
+        returns = await service.transaction_repository.get_all_with_lines(
+            reference_transaction_id=purchase_id,
+            transaction_type=TransactionType.RETURN,
+            active_only=True
+        )
+        
+        # Transform to response format
+        return_list = []
+        for return_txn in returns:
+            return_list.append({
+                "id": return_txn.id,
+                "transaction_number": return_txn.transaction_number,
+                "transaction_date": return_txn.transaction_date,
+                "status": return_txn.status,
+                "total_amount": float(return_txn.total_amount),
+                "items_returned": len(return_txn.transaction_lines),
+                "created_at": return_txn.created_at
+            })
+        
+        return {
+            "purchase_id": purchase_id,
+            "purchase_number": purchase_txn.transaction_number,
+            "returns": return_list,
+            "total_returns": len(return_list)
+        }
+        
+    except NotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting purchase returns: {str(e)}"
+        )
+
+
 @router.post(
     "/new-purchase", response_model=NewPurchaseResponse, status_code=status.HTTP_201_CREATED
 )

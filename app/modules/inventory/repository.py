@@ -494,16 +494,8 @@ class StockLevelRepository:
         
         if stock_data.quantity_available:
             stock_level.quantity_available = stock_data.quantity_available
-        if stock_data.quantity_reserved:
-            stock_level.quantity_reserved = stock_data.quantity_reserved
-        if stock_data.quantity_on_order:
-            stock_level.quantity_on_order = stock_data.quantity_on_order
-        if stock_data.minimum_level:
-            stock_level.minimum_level = stock_data.minimum_level
-        if stock_data.maximum_level:
-            stock_level.maximum_level = stock_data.maximum_level
-        if stock_data.reorder_point:
-            stock_level.reorder_point = stock_data.reorder_point
+        if stock_data.quantity_on_rent:
+            stock_level.quantity_on_rent = stock_data.quantity_on_rent
         
         self.session.add(stock_level)
         await self.session.commit()
@@ -580,18 +572,10 @@ class StockLevelRepository:
         return result.scalars().all()
     
     async def get_low_stock_items(self, active_only: bool = True) -> List[StockLevel]:
-        """Get items with low stock (below reorder point)."""
-        query = select(StockLevel).where(
-            func.cast(StockLevel.quantity_on_hand, func.Integer) <= func.cast(StockLevel.reorder_point, func.Integer)
-        )
-        
-        if active_only:
-            query = query.where(StockLevel.is_active == True)
-        
-        query = query.order_by(asc(StockLevel.item_id))
-        
-        result = await self.session.execute(query)
-        return result.scalars().all()
+        """Get items with low stock (below configurable threshold)."""
+        # Since reorder_point was removed, return empty list for now
+        # This method can be enhanced later with configurable thresholds
+        return []
     
     async def update(self, stock_id: UUID, stock_data: StockLevelUpdate) -> Optional[StockLevel]:
         """Update a stock level."""

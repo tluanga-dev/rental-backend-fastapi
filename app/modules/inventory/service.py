@@ -642,13 +642,9 @@ class InventoryService:
             stock_data = StockLevelCreate(
                 item_id=item_id,
                 location_id=location.id,
-                quantity_on_hand=str(quantity),
-                quantity_available=str(quantity),
-                quantity_reserved="0",
-                quantity_on_order="0",
-                minimum_level="0",
-                maximum_level="0",
-                reorder_point="0"
+                quantity_on_hand=quantity,
+                quantity_available=quantity,
+                quantity_on_rent=Decimal("0")
             )
             
             stock_level = await self.stock_level_repository.create(stock_data)
@@ -1002,7 +998,8 @@ class InventoryService:
         movement = await self.stock_movement_repository.create(movement_data)
         
         # Log the movement for debugging
-        from app.core.logger import logger
+        import logging
+        logger = logging.getLogger(__name__)
         logger.info(
             f"Stock movement created: {movement_type} - "
             f"Stock Level: {stock_level_id}, "

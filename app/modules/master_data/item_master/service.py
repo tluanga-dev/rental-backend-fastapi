@@ -398,8 +398,8 @@ class ItemMasterService:
                 "model_number": item.model_number,
                 "serial_number_required": item.serial_number_required,
                 "warranty_period_days": item.warranty_period_days or "0",
-                "reorder_level": item.reorder_level or "0",
-                "reorder_quantity": item.reorder_quantity or "0",
+                "reorder_level": item.reorder_point or 0,
+                "reorder_quantity": 0,  # This field doesn't exist in the model
                 "is_rentable": item.is_rentable,
                 "is_saleable": item.is_saleable,
             }

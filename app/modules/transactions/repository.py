@@ -43,7 +43,6 @@ class TransactionHeaderRepository:
             if transaction_data.sales_person_id
             else None,
             status=transaction_data.status,
-            payment_status=transaction_data.payment_status,
             reference_transaction_id=str(transaction_data.reference_transaction_id)
             if transaction_data.reference_transaction_id
             else None,
@@ -142,6 +141,7 @@ class TransactionHeaderRepository:
         customer_id: Optional[UUID] = None,
         location_id: Optional[UUID] = None,
         sales_person_id: Optional[UUID] = None,
+        reference_transaction_id: Optional[UUID] = None,
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
         active_only: bool = True,
@@ -165,6 +165,8 @@ class TransactionHeaderRepository:
             conditions.append(TransactionHeader.location_id == str(location_id))
         if sales_person_id:
             conditions.append(TransactionHeader.sales_person_id == str(sales_person_id))
+        if reference_transaction_id:
+            conditions.append(TransactionHeader.reference_transaction_id == str(reference_transaction_id))
         if date_from:
             conditions.append(
                 TransactionHeader.transaction_date

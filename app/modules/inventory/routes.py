@@ -502,9 +502,9 @@ async def get_item_stock_summary(
         inventory_units = await service.get_inventory_units(item_id=item_id)
         
         # Calculate summary statistics
-        total_on_hand = sum(int(stock.quantity_on_hand) for stock in stock_levels)
-        total_available = sum(int(stock.quantity_available) for stock in stock_levels)
-        total_reserved = sum(int(stock.quantity_reserved) for stock in stock_levels)
+        total_on_hand = sum(float(stock.quantity_on_hand) for stock in stock_levels)
+        total_available = sum(float(stock.quantity_available) for stock in stock_levels)
+        total_on_rent = sum(float(stock.quantity_on_rent) for stock in stock_levels)
         
         # Count units by status
         units_by_status = {}
@@ -525,7 +525,7 @@ async def get_item_stock_summary(
             "aggregate_quantities": {
                 "on_hand": total_on_hand,
                 "available": total_available,
-                "reserved": total_reserved
+                "on_rent": total_on_rent
             },
             "units_by_status": units_by_status,
             "units_by_location": units_by_location,

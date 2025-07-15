@@ -796,7 +796,12 @@ class TransactionService:
             raise NotFoundError(f"Purchase transaction with ID {purchase_id} not found")
         
         # Verify it's a purchase transaction
-        if transaction.transaction_type != TransactionType.PURCHASE.value:
+        # Handle both enum and string values
+        transaction_type_value = transaction.transaction_type
+        if hasattr(transaction_type_value, 'value'):
+            transaction_type_value = transaction_type_value.value
+        
+        if transaction_type_value != TransactionType.PURCHASE.value:
             raise ValidationError(f"Transaction {purchase_id} is not a purchase transaction")
         
         # Fetch supplier details
@@ -942,7 +947,6 @@ class TransactionService:
                 ),  # Store supplier_id in customer_id field
                 location_id=str(purchase_data.location_id),
                 status=TransactionStatus.COMPLETED,
-                payment_status=PaymentStatus.PENDING,
                 notes=purchase_data.notes or "",
                 subtotal=Decimal("0"),
                 discount_amount=Decimal("0"),
@@ -1084,7 +1088,6 @@ class TransactionService:
                 customer_id=str(rental_data.customer_id),
                 location_id=str(rental_data.location_id),
                 status=TransactionStatus.CONFIRMED,
-                payment_status=PaymentStatus.PENDING,
                 payment_method=PaymentMethod(rental_data.payment_method),
                 payment_reference=rental_data.payment_reference or "",
                 notes=rental_data.notes or "",
@@ -1231,9 +1234,9 @@ class TransactionService:
                 # Log existing stock found
                 existing_stock_data = {
                     "id": str(existing_stock.id),
-                    "quantity_on_hand": str(existing_stock.quantity_on_hand),
-                    "quantity_available": str(existing_stock.quantity_available),
-                    "quantity_on_rent": str(existing_stock.quantity_on_rent)
+                    "quantity_on_hand": existing_stock.quantity_on_hand,
+                    "quantity_available": existing_stock.quantity_available,
+                    "quantity_on_rent": existing_stock.quantity_on_rent
                 }
                 self.logger.log_item_stock_processing(str(item.item_id), item.quantity, existing_stock_data)
                 

@@ -1,0 +1,746 @@
+{
+  "purchase_transaction_examples": {
+    "description": "Comprehensive JSON examples for purchase transaction payloads",
+    "endpoint": "POST /api/transactions/new-purchase",
+    "content_type": "application/json",
+    "examples": {
+      "1_minimal_purchase": {
+        "description": "Minimal purchase with only required fields",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 10,
+              "unit_cost": 25.50,
+              "condition": "A"
+            }
+          ]
+        }
+      },
+      "2_complete_purchase": {
+        "description": "Complete purchase with all possible fields",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "notes": "Q1 2024 inventory replenishment - urgent order",
+          "reference_number": "PO-2024-Q1-001",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 50,
+              "unit_cost": 25.50,
+              "tax_rate": 8.5,
+              "discount_amount": 50.00,
+              "condition": "A",
+              "notes": "Brand new items - priority stock"
+            },
+            {
+              "item_id": "012e3456-e89b-12d3-a456-426614174003",
+              "quantity": 30,
+              "unit_cost": 15.75,
+              "tax_rate": 8.5,
+              "discount_amount": 0,
+              "condition": "B",
+              "notes": "Slightly used but good quality"
+            }
+          ]
+        }
+      },
+      "3_multi_condition_purchase": {
+        "description": "Purchase with items in all conditions (A, B, C, D)",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "notes": "Mixed condition inventory purchase",
+          "reference_number": "MIX-2024-001",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 100,
+              "unit_cost": 50.00,
+              "tax_rate": 10.0,
+              "condition": "A",
+              "notes": "New premium items"
+            },
+            {
+              "item_id": "012e3456-e89b-12d3-a456-426614174003",
+              "quantity": 75,
+              "unit_cost": 40.00,
+              "tax_rate": 10.0,
+              "discount_amount": 100.00,
+              "condition": "B",
+              "notes": "Good condition with bulk discount"
+            },
+            {
+              "item_id": "345e6789-e89b-12d3-a456-426614174004",
+              "quantity": 50,
+              "unit_cost": 30.00,
+              "tax_rate": 8.5,
+              "discount_amount": 200.00,
+              "condition": "C",
+              "notes": "Fair condition - clearance items"
+            },
+            {
+              "item_id": "678e9012-e89b-12d3-a456-426614174005",
+              "quantity": 25,
+              "unit_cost": 20.00,
+              "tax_rate": 5.0,
+              "discount_amount": 150.00,
+              "condition": "D",
+              "notes": "Poor condition - for parts/repair"
+            }
+          ]
+        }
+      },
+      "4_large_batch_purchase": {
+        "description": "Large batch purchase for new store opening",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "notes": "Large batch purchase for new store opening",
+          "reference_number": "BATCH-2024-STORE-001",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 500,
+              "unit_cost": 12.99,
+              "tax_rate": 8.5,
+              "discount_amount": 500.00,
+              "condition": "A",
+              "notes": "Bulk order - new store inventory"
+            },
+            {
+              "item_id": "012e3456-e89b-12d3-a456-426614174003",
+              "quantity": 300,
+              "unit_cost": 24.99,
+              "tax_rate": 8.5,
+              "discount_amount": 750.00,
+              "condition": "A",
+              "notes": "Premium items for display"
+            },
+            {
+              "item_id": "345e6789-e89b-12d3-a456-426614174004",
+              "quantity": 200,
+              "unit_cost": 8.50,
+              "tax_rate": 8.5,
+              "discount_amount": 200.00,
+              "condition": "B",
+              "notes": "Budget items for rental stock"
+            },
+            {
+              "item_id": "678e9012-e89b-12d3-a456-426614174005",
+              "quantity": 150,
+              "unit_cost": 35.00,
+              "tax_rate": 8.5,
+              "discount_amount": 300.00,
+              "condition": "A",
+              "notes": "High-end rental equipment"
+            },
+            {
+              "item_id": "901e2345-e89b-12d3-a456-426614174006",
+              "quantity": 100,
+              "unit_cost": 18.75,
+              "tax_rate": 8.5,
+              "discount_amount": 100.00,
+              "condition": "B",
+              "notes": "Refurbished items for rental"
+            }
+          ]
+        }
+      },
+      "5_emergency_purchase": {
+        "description": "Emergency purchase with high priority",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "notes": "EMERGENCY: Critical inventory shortage - expedited delivery required",
+          "reference_number": "EMERG-2024-001",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 20,
+              "unit_cost": 75.00,
+              "tax_rate": 8.5,
+              "condition": "A",
+              "notes": "Critical shortage - rush order"
+            },
+            {
+              "item_id": "012e3456-e89b-12d3-a456-426614174003",
+              "quantity": 15,
+              "unit_cost": 45.00,
+              "tax_rate": 8.5,
+              "condition": "A",
+              "notes": "Replacement for damaged stock"
+            }
+          ]
+        }
+      },
+      "6_seasonal_purchase": {
+        "description": "Seasonal purchase for holiday inventory",
+        "payload": {
+          "supplier_id": "456e7890-e89b-12d3-a456-426614174001",
+          "location_id": "789e0123-e89b-12d3-a456-426614174002",
+          "purchase_date": "2024-10-15",
+          "notes": "Holiday season inventory - Christmas/New Year preparation",
+          "reference_number": "SEASON-2024-XMAS",
+          "items": [
+            {
+              "item_id": "123e4567-e89b-12d3-a456-426614174000",
+              "quantity": 200,
+              "unit_cost": 29.99,
+              "tax_rate": 8.5,
+              "discount_amount": 200.00,
+              "condition": "A",
+              "notes": "Holiday decorations - premium quality"
+            },
+            {
+              "item_id": "234e5678-e89b-12d3-a456-426614174001",
+              "quantity": 150,
+              "unit_cost": 19.99,
+              "tax_rate": 8.5,
+              "discount_amount": 150.00,
+              "condition": "A",
+              "notes": "Seasonal lighting equipment"
+            },
+            {
+              "item_id": "345e6789-e89b-12d3-a456-426614174002",
+              "quantity": 100,
+              "unit_cost": 39.99,
+              "tax_rate": 8.5,
+              "discount_amount": 100.00,
+              "condition": "A",
+              "notes": "Special event equipment"
+            }
+          ]
+        }
+      },
+      "7_clearance_purchase": {
+        "description": "Clearance purchase with heavily discounted items",
+        "payload": {
+          "supplier_id": "789e0123-e89b-12d3-a456-426614174002",
+          "location_id": "012e3456-e89b-12d3-a456-426614174003",
+          "purchase_date": "2024-01-15",
+          "notes": "Clearance sale - end of season inventory at discounted prices",
+          "reference_number": "CLEAR-2024-001",
+          "items": [
+            {
+              "item_id": "456e7890-e89b-12d3-a456-426614174001",
+              "quantity": 80,
+              "unit_cost": 15.00,
+              "tax_rate": 8.5,
+              "discount_amount": 400.00,
+              "condition": "C",
+              "notes": "Clearance items - fair condition"
+            },
+            {
+              "item_id": "567e8901-e89b-12d3-a456-426614174002",
+              "quantity": 60,
+              "unit_cost": 12.00,
+              "tax_rate": 8.5,
+              "discount_amount": 300.00,
+              "condition": "C",
+              "notes": "End of season clearance"
+            },
+            {
+              "item_id": "678e9012-e89b-12d3-a456-426614174003",
+              "quantity": 40,
+              "unit_cost": 8.00,
+              "tax_rate": 8.5,
+              "discount_amount": 200.00,
+              "condition": "D",
+              "notes": "As-is condition - final sale"
+            }
+          ]
+        }
+      },
+      "8_international_purchase": {
+        "description": "International purchase with currency considerations",
+        "payload": {
+          "supplier_id": "345e6789-e89b-12d3-a456-426614174004",
+          "location_id": "678e9012-e89b-12d3-a456-426614174005",
+          "purchase_date": "2024-01-15",
+          "notes": "International supplier - prices in USD, account for exchange rates and customs",
+          "reference_number": "INTL-2024-001",
+          "items": [
+            {
+              "item_id": "890e1234-e89b-12d3-a456-426614174006",
+              "quantity": 100,
+              "unit_cost": 45.00,
+              "tax_rate": 12.0,
+              "condition": "A",
+              "notes": "Imported goods - includes shipping and customs"
+            },
+            {
+              "item_id": "901e2345-e89b-12d3-a456-426614174007",
+              "quantity": 50,
+              "unit_cost": 85.00,
+              "tax_rate": 12.0,
+              "condition": "A",
+              "notes": "Premium imported equipment"
+            }
+          ]
+        }
+      },
+      "9_boundary_values": {
+        "description": "Testing boundary values (minimum and maximum)",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-02-29",
+          "notes": "Boundary value testing - leap year date",
+          "reference_number": "BOUNDARY-2024-001",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 1,
+              "unit_cost": 0.01,
+              "tax_rate": 0,
+              "discount_amount": 0,
+              "condition": "A",
+              "notes": "Minimum values test"
+            },
+            {
+              "item_id": "012e3456-e89b-12d3-a456-426614174003",
+              "quantity": 9999,
+              "unit_cost": 9999.99,
+              "tax_rate": 100,
+              "discount_amount": 999.99,
+              "condition": "D",
+              "notes": "Maximum values test"
+            }
+          ]
+        }
+      },
+      "10_special_characters": {
+        "description": "Purchase with special characters and Unicode",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "notes": "Special characters test: émojis 🎉, unicode ñ, quotes \"double\" & 'single', <tags>, line\nbreaks, and\ttabs",
+          "reference_number": "SPECIAL-CHARS-001",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 10,
+              "unit_cost": 25.50,
+              "tax_rate": 8.5,
+              "condition": "A",
+              "notes": "Unicode test: café, résumé, naïve, symbols: @#$%^&*()[]{}|\\:;\"<>?,./"
+            },
+            {
+              "item_id": "012e3456-e89b-12d3-a456-426614174003",
+              "quantity": 15,
+              "unit_cost": 30.00,
+              "tax_rate": 8.5,
+              "condition": "B",
+              "notes": "More special chars: ±×÷≤≥≠±°©®™€£¥¢"
+            }
+          ]
+        }
+      },
+      "11_no_tax_purchase": {
+        "description": "Purchase without tax (tax-exempt)",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "notes": "Tax-exempt purchase - educational institution",
+          "reference_number": "TAX-EXEMPT-001",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 25,
+              "unit_cost": 120.00,
+              "tax_rate": 0,
+              "condition": "A",
+              "notes": "Educational equipment - tax exempt"
+            },
+            {
+              "item_id": "012e3456-e89b-12d3-a456-426614174003",
+              "quantity": 10,
+              "unit_cost": 250.00,
+              "tax_rate": 0,
+              "condition": "A",
+              "notes": "Research equipment - no tax"
+            }
+          ]
+        }
+      },
+      "12_high_discount_purchase": {
+        "description": "Purchase with high discount amounts",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "notes": "Volume discount purchase - partnership pricing",
+          "reference_number": "VOLUME-2024-001",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 500,
+              "unit_cost": 100.00,
+              "tax_rate": 8.5,
+              "discount_amount": 10000.00,
+              "condition": "A",
+              "notes": "20% volume discount applied"
+            },
+            {
+              "item_id": "012e3456-e89b-12d3-a456-426614174003",
+              "quantity": 200,
+              "unit_cost": 75.00,
+              "tax_rate": 8.5,
+              "discount_amount": 3000.00,
+              "condition": "A",
+              "notes": "20% partnership discount"
+            }
+          ]
+        }
+      },
+      "13_mixed_tax_rates": {
+        "description": "Purchase with different tax rates per item",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "notes": "Mixed tax rates - different categories",
+          "reference_number": "MIXED-TAX-001",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 20,
+              "unit_cost": 50.00,
+              "tax_rate": 0,
+              "condition": "A",
+              "notes": "Food items - no tax"
+            },
+            {
+              "item_id": "012e3456-e89b-12d3-a456-426614174003",
+              "quantity": 15,
+              "unit_cost": 75.00,
+              "tax_rate": 8.5,
+              "condition": "A",
+              "notes": "General merchandise - standard tax"
+            },
+            {
+              "item_id": "345e6789-e89b-12d3-a456-426614174004",
+              "quantity": 10,
+              "unit_cost": 200.00,
+              "tax_rate": 15.0,
+              "condition": "A",
+              "notes": "Luxury items - higher tax rate"
+            }
+          ]
+        }
+      },
+      "14_warranty_purchase": {
+        "description": "Purchase with warranty considerations",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "notes": "Equipment purchase with extended warranty coverage",
+          "reference_number": "WARRANTY-2024-001",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 10,
+              "unit_cost": 500.00,
+              "tax_rate": 8.5,
+              "condition": "A",
+              "notes": "Professional equipment - 3-year warranty included"
+            },
+            {
+              "item_id": "012e3456-e89b-12d3-a456-426614174003",
+              "quantity": 5,
+              "unit_cost": 1200.00,
+              "tax_rate": 8.5,
+              "condition": "A",
+              "notes": "High-end equipment - 5-year extended warranty"
+            }
+          ]
+        }
+      },
+      "15_refurbished_purchase": {
+        "description": "Purchase of refurbished items",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "notes": "Refurbished equipment purchase - certified pre-owned",
+          "reference_number": "REFURB-2024-001",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 30,
+              "unit_cost": 150.00,
+              "tax_rate": 8.5,
+              "discount_amount": 300.00,
+              "condition": "B",
+              "notes": "Certified refurbished - 1-year warranty"
+            },
+            {
+              "item_id": "012e3456-e89b-12d3-a456-426614174003",
+              "quantity": 20,
+              "unit_cost": 100.00,
+              "tax_rate": 8.5,
+              "discount_amount": 200.00,
+              "condition": "C",
+              "notes": "Factory refurbished - 6-month warranty"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "validation_examples": {
+    "description": "Examples that will trigger validation errors",
+    "invalid_examples": {
+      "missing_required_fields": {
+        "description": "Missing required supplier_id field",
+        "payload": {
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 10,
+              "unit_cost": 25.50,
+              "condition": "A"
+            }
+          ]
+        },
+        "expected_error": "Field required"
+      },
+      "invalid_uuid": {
+        "description": "Invalid UUID format",
+        "payload": {
+          "supplier_id": "not-a-uuid",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 10,
+              "unit_cost": 25.50,
+              "condition": "A"
+            }
+          ]
+        },
+        "expected_error": "Invalid UUID format"
+      },
+      "invalid_date": {
+        "description": "Invalid date format",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "15-01-2024",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 10,
+              "unit_cost": 25.50,
+              "condition": "A"
+            }
+          ]
+        },
+        "expected_error": "Invalid date format"
+      },
+      "negative_quantity": {
+        "description": "Negative quantity",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": -10,
+              "unit_cost": 25.50,
+              "condition": "A"
+            }
+          ]
+        },
+        "expected_error": "Input should be greater than or equal to 1"
+      },
+      "invalid_condition": {
+        "description": "Invalid condition code",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 10,
+              "unit_cost": 25.50,
+              "condition": "E"
+            }
+          ]
+        },
+        "expected_error": "Input should be 'A', 'B', 'C' or 'D'"
+      },
+      "empty_items": {
+        "description": "Empty items array",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "items": []
+        },
+        "expected_error": "List should have at least 1 item"
+      },
+      "tax_rate_over_limit": {
+        "description": "Tax rate over 100%",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 10,
+              "unit_cost": 25.50,
+              "tax_rate": 101,
+              "condition": "A"
+            }
+          ]
+        },
+        "expected_error": "Input should be less than or equal to 100"
+      },
+      "negative_unit_cost": {
+        "description": "Negative unit cost",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 10,
+              "unit_cost": -25.50,
+              "condition": "A"
+            }
+          ]
+        },
+        "expected_error": "Input should be greater than or equal to 0"
+      },
+      "negative_discount": {
+        "description": "Negative discount amount",
+        "payload": {
+          "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "purchase_date": "2024-01-15",
+          "items": [
+            {
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "quantity": 10,
+              "unit_cost": 25.50,
+              "discount_amount": -5.00,
+              "condition": "A"
+            }
+          ]
+        },
+        "expected_error": "Input should be greater than or equal to 0"
+      }
+    }
+  },
+  "response_examples": {
+    "description": "Expected response structures",
+    "success_response": {
+      "status_code": 201,
+      "description": "Successful purchase creation",
+      "payload": {
+        "success": true,
+        "message": "Purchase transaction created successfully",
+        "transaction_id": "abc12345-e89b-12d3-a456-426614174004",
+        "transaction_number": "PUR-20240115-7823",
+        "data": {
+          "id": "abc12345-e89b-12d3-a456-426614174004",
+          "transaction_number": "PUR-20240115-7823",
+          "transaction_type": "PURCHASE",
+          "transaction_date": "2024-01-15T00:00:00Z",
+          "customer_id": "123e4567-e89b-12d3-a456-426614174000",
+          "location_id": "456e7890-e89b-12d3-a456-426614174001",
+          "status": "COMPLETED",
+          "payment_status": "PENDING",
+          "subtotal": 2750.00,
+          "discount_amount": 50.00,
+          "tax_amount": 237.75,
+          "total_amount": 2937.75,
+          "paid_amount": 0.00,
+          "notes": "Q1 2024 inventory replenishment",
+          "created_at": "2024-01-15T10:30:00Z",
+          "updated_at": "2024-01-15T10:30:00Z",
+          "transaction_lines": [
+            {
+              "id": "def45678-e89b-12d3-a456-426614174005",
+              "line_number": 1,
+              "item_id": "789e0123-e89b-12d3-a456-426614174002",
+              "description": "Purchase: 789e0123-e89b-12d3-a456-426614174002 (Condition: A)",
+              "quantity": 100,
+              "unit_price": 15.50,
+              "tax_rate": 8.5,
+              "tax_amount": 131.75,
+              "discount_amount": 50.00,
+              "line_total": 1631.75,
+              "notes": "Brand new items",
+              "created_at": "2024-01-15T10:30:00Z",
+              "updated_at": "2024-01-15T10:30:00Z"
+            }
+          ]
+        }
+      }
+    },
+    "validation_error_response": {
+      "status_code": 422,
+      "description": "Validation error",
+      "payload": {
+        "detail": [
+          {
+            "type": "missing",
+            "loc": [
+              "body",
+              "supplier_id"
+            ],
+            "msg": "Field required",
+            "input": {
+              "location_id": "456e7890-e89b-12d3-a456-426614174001",
+              "purchase_date": "2024-01-15",
+              "items": []
+            }
+          }
+        ]
+      }
+    },
+    "not_found_error_response": {
+      "status_code": 404,
+      "description": "Entity not found error",
+      "payload": {
+        "detail": "Supplier with ID 123e4567-e89b-12d3-a456-426614174000 not found"
+      }
+    }
+  },
+  "integration_guides": {
+    "description": "Integration examples for different programming languages",
+    "curl_example": {
+      "description": "Using cURL command line",
+      "command": "curl -X POST \"http://localhost:8000/api/transactions/new-purchase\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"supplier_id\": \"123e4567-e89b-12d3-a456-426614174000\",\n    \"location_id\": \"456e7890-e89b-12d3-a456-426614174001\",\n    \"purchase_date\": \"2024-01-15\",\n    \"items\": [\n      {\n        \"item_id\": \"789e0123-e89b-12d3-a456-426614174002\",\n        \"quantity\": 10,\n        \"unit_cost\": 25.50,\n        \"condition\": \"A\"\n      }\n    ]\n  }'"
+    },
+    "javascript_fetch": {
+      "description": "Using JavaScript fetch API",
+      "code": "const purchaseData = {\n  supplier_id: '123e4567-e89b-12d3-a456-426614174000',\n  location_id: '456e7890-e89b-12d3-a456-426614174001',\n  purchase_date: '2024-01-15',\n  items: [\n    {\n      item_id: '789e0123-e89b-12d3-a456-426614174002',\n      quantity: 10,\n      unit_cost: 25.50,\n      condition: 'A'\n    }\n  ]\n};\n\nfetch('/api/transactions/new-purchase', {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n  },\n  body: JSON.stringify(purchaseData)\n})\n.then(response => response.json())\n.then(data => console.log('Success:', data))\n.catch(error => console.error('Error:', error));"
+    },
+    "python_requests": {
+      "description": "Using Python requests library",
+      "code": "import requests\nimport json\n\npurchase_data = {\n    'supplier_id': '123e4567-e89b-12d3-a456-426614174000',\n    'location_id': '456e7890-e89b-12d3-a456-426614174001',\n    'purchase_date': '2024-01-15',\n    'items': [\n        {\n            'item_id': '789e0123-e89b-12d3-a456-426614174002',\n            'quantity': 10,\n            'unit_cost': 25.50,\n            'condition': 'A'\n        }\n    ]\n}\n\nresponse = requests.post(\n    'http://localhost:8000/api/transactions/new-purchase',\n    headers={'Content-Type': 'application/json'},\n    json=purchase_data\n)\n\nif response.status_code == 201:\n    result = response.json()\n    print('Success:', result)\nelse:\n    print('Error:', response.text)"
+    }
+  }
+}
