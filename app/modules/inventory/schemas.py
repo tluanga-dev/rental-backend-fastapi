@@ -330,3 +330,175 @@ class StockMovementReportRequest(BaseModel):
     include_details: bool = Field(default=False, description="Include detailed movements")
 
 
+# Item Inventory Overview and Detailed Schemas
+
+class LocationStockInfo(BaseModel):
+    """Schema for stock information at a specific location."""
+    location_id: UUID
+    location_name: str
+    quantity_on_hand: Decimal
+    quantity_available: Decimal
+    quantity_on_rent: Decimal
+
+
+class UnitsByStatus(BaseModel):
+    """Schema for inventory units grouped by status."""
+    available: int = 0
+    rented: int = 0
+    sold: int = 0
+    maintenance: int = 0
+    damaged: int = 0
+    retired: int = 0
+
+
+class ItemInventoryOverview(BaseModel):
+    """Schema for item inventory overview - optimized for table display."""
+    model_config = ConfigDict(from_attributes=True)
+    
+    # Item basic info
+    id: UUID
+    sku: str
+    item_name: str
+    item_status: ItemStatus
+    brand_name: Optional[str]
+    category_name: Optional[str]
+    
+    # Pricing info
+    rental_rate_per_period: Optional[Decimal]
+    sale_price: Optional[Decimal]
+    is_rentable: bool
+    is_saleable: bool
+    
+    # Inventory summary
+    total_units: int
+    units_by_status: UnitsByStatus
+    
+    # Stock summary
+    total_quantity_on_hand: Decimal
+    total_quantity_available: Decimal
+    total_quantity_on_rent: Decimal
+    
+    # Status indicators
+    stock_status: str  # IN_STOCK, LOW_STOCK, OUT_OF_STOCK
+    reorder_point: int
+    is_low_stock: bool
+    
+    # Timestamps
+    created_at: datetime
+    updated_at: datetime
+
+
+class InventoryUnitDetail(BaseModel):
+    """Schema for detailed inventory unit information."""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: UUID
+    unit_code: str
+    serial_number: Optional[str]
+    status: InventoryUnitStatus
+    condition: InventoryUnitCondition
+    location_id: UUID
+    location_name: str
+    purchase_date: Optional[datetime]
+    purchase_price: Decimal
+    warranty_expiry: Optional[datetime]
+    last_maintenance_date: Optional[datetime]
+    next_maintenance_date: Optional[datetime]
+    notes: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+class RecentMovement(BaseModel):
+    """Schema for recent stock movements."""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: UUID
+    movement_type: MovementType
+    quantity_change: Decimal
+    reason: str
+    reference_type: ReferenceType
+    reference_id: Optional[str]
+    location_name: str
+    created_at: datetime
+    created_by_name: Optional[str]
+
+
+class ItemInventoryDetailed(BaseModel):
+    """Schema for detailed item inventory information."""
+    model_config = ConfigDict(from_attributes=True)
+    
+    # Complete item details
+    id: UUID
+    sku: str
+    item_name: str
+    item_status: ItemStatus
+    brand_id: Optional[UUID]
+    brand_name: Optional[str]
+    category_id: Optional[UUID]
+    category_name: Optional[str]
+    unit_of_measurement_id: UUID
+    unit_of_measurement_name: str
+    
+    # Item specifications
+    description: Optional[str]
+    specifications: Optional[str]
+    model_number: Optional[str]
+    serial_number_required: bool
+    warranty_period_days: str
+    
+    # Pricing and rental info
+    rental_rate_per_period: Optional[Decimal]
+    rental_period: str
+    sale_price: Optional[Decimal]
+    purchase_price: Optional[Decimal]
+    security_deposit: Decimal
+    is_rentable: bool
+    is_saleable: bool
+    
+    # Inventory summary
+    total_units: int
+    units_by_status: UnitsByStatus
+    
+    # Detailed units list
+    inventory_units: List[InventoryUnitDetail]
+    
+    # Stock levels by location
+    stock_by_location: List[LocationStockInfo]
+    
+    # Aggregate stock info
+    total_quantity_on_hand: Decimal
+    total_quantity_available: Decimal
+    total_quantity_on_rent: Decimal
+    
+    # Reorder info
+    reorder_point: int
+    stock_status: str
+    is_low_stock: bool
+    
+    # Recent movements (last 10)
+    recent_movements: List[RecentMovement]
+    
+    # Timestamps and audit
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    created_by: Optional[UUID]
+    updated_by: Optional[UUID]
+
+
+class ItemInventoryOverviewParams(BaseModel):
+    """Query parameters for item inventory overview."""
+    skip: int = Field(default=0, ge=0)
+    limit: int = Field(default=100, ge=1, le=1000)
+    item_status: Optional[ItemStatus] = None
+    brand_id: Optional[UUID] = None
+    category_id: Optional[UUID] = None
+    stock_status: Optional[str] = Field(None, pattern="^(IN_STOCK|LOW_STOCK|OUT_OF_STOCK)$")
+    is_rentable: Optional[bool] = None
+    is_saleable: Optional[bool] = None
+    search: Optional[str] = None
+    sort_by: Optional[str] = Field(default="item_name", pattern="^(item_name|sku|created_at|total_units|stock_status)$")
+    sort_order: Optional[str] = Field(default="asc", pattern="^(asc|desc)$")
+
+

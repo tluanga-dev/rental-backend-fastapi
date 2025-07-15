@@ -1208,3 +1208,305 @@ class InventoryService:
         )
         
         return StockMovementResponse.model_validate(movement)
+    
+    # Item Inventory Overview and Detailed operations
+    async def get_items_inventory_overview(
+        self,
+        params: ItemInventoryOverviewParams
+    ) -> List[ItemInventoryOverview]:
+        """Get inventory overview for multiple items - optimized for table display."""
+        from sqlalchemy import select, func, case, and_, or_
+        from sqlalchemy.orm import selectinload
+        
+        # Base query for items
+        query = select(Item).options(
+            selectinload(Item.brand),
+            selectinload(Item.category),
+            selectinload(Item.inventory_units),
+            selectinload(Item.stock_levels)
+        )
+        
+        # Apply filters
+        filters = []
+        if params.item_status:
+            filters.append(Item.item_status == params.item_status.value)
+        if params.brand_id:
+            filters.append(Item.brand_id == params.brand_id)
+        if params.category_id:
+            filters.append(Item.category_id == params.category_id)
+        if params.is_rentable is not None:
+            filters.append(Item.is_rentable == params.is_rentable)
+        if params.is_saleable is not None:
+            filters.append(Item.is_saleable == params.is_saleable)
+        if params.search:
+            search_term = f"%{params.search}%"
+            filters.append(
+                or_(
+                    Item.item_name.ilike(search_term),
+                    Item.sku.ilike(search_term)
+                )
+            )
+        
+        # Always filter active items
+        filters.append(Item.is_active == True)
+        
+        if filters:
+            query = query.where(and_(*filters))
+        
+        # Execute query
+        result = await self.session.execute(query)
+        items = result.scalars().all()
+        
+        # Build overview list
+        overview_list = []
+        for item in items:
+            # Calculate units by status
+            units_by_status = UnitsByStatus()
+            for unit in item.inventory_units:
+                if unit.is_active:
+                    status = unit.status.lower()
+                    if hasattr(units_by_status, status):
+                        setattr(units_by_status, status, getattr(units_by_status, status) + 1)
+            
+            # Calculate stock totals
+            total_on_hand = Decimal("0")
+            total_available = Decimal("0")
+            total_on_rent = Decimal("0")
+            
+            for stock_level in item.stock_levels:
+                if stock_level.is_active:
+                    total_on_hand += stock_level.quantity_on_hand
+                    total_available += stock_level.quantity_available
+                    total_on_rent += stock_level.quantity_on_rent
+            
+            # Determine stock status
+            if units_by_status.available == 0 and total_available == 0:
+                stock_status = "OUT_OF_STOCK"
+            elif item.is_low_stock():
+                stock_status = "LOW_STOCK"
+            else:
+                stock_status = "IN_STOCK"
+            
+            overview = ItemInventoryOverview(
+                id=item.id,
+                sku=item.sku,
+                item_name=item.item_name,
+                item_status=item.item_status,
+                brand_name=item.brand.brand_name if item.brand else None,
+                category_name=item.category.category_name if item.category else None,
+                rental_rate_per_period=item.rental_rate_per_period,
+                sale_price=item.sale_price,
+                is_rentable=item.is_rentable,
+                is_saleable=item.is_saleable,
+                total_units=len([u for u in item.inventory_units if u.is_active]),
+                units_by_status=units_by_status,
+                total_quantity_on_hand=total_on_hand,
+                total_quantity_available=total_available,
+                total_quantity_on_rent=total_on_rent,
+                stock_status=stock_status,
+                reorder_point=item.reorder_point,
+                is_low_stock=item.is_low_stock(),
+                created_at=item.created_at,
+                updated_at=item.updated_at
+            )
+            overview_list.append(overview)
+        
+        # Apply stock status filter if specified
+        if params.stock_status:
+            overview_list = [o for o in overview_list if o.stock_status == params.stock_status]
+        
+        # Sort results
+        sort_key = params.sort_by
+        reverse = params.sort_order == "desc"
+        
+        if sort_key == "item_name":
+            overview_list.sort(key=lambda x: x.item_name, reverse=reverse)
+        elif sort_key == "sku":
+            overview_list.sort(key=lambda x: x.sku, reverse=reverse)
+        elif sort_key == "created_at":
+            overview_list.sort(key=lambda x: x.created_at, reverse=reverse)
+        elif sort_key == "total_units":
+            overview_list.sort(key=lambda x: x.total_units, reverse=reverse)
+        elif sort_key == "stock_status":
+            # Define sort order for stock status
+            status_order = {"OUT_OF_STOCK": 0, "LOW_STOCK": 1, "IN_STOCK": 2}
+            overview_list.sort(
+                key=lambda x: status_order.get(x.stock_status, 3),
+                reverse=reverse
+            )
+        
+        # Apply pagination
+        start = params.skip
+        end = params.skip + params.limit
+        return overview_list[start:end]
+    
+    async def get_item_inventory_detailed(self, item_id: UUID) -> ItemInventoryDetailed:
+        """Get detailed inventory information for a single item."""
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
+        
+        # Get item with all relationships
+        query = select(Item).options(
+            selectinload(Item.brand),
+            selectinload(Item.category),
+            selectinload(Item.unit_of_measurement),
+            selectinload(Item.inventory_units),
+            selectinload(Item.stock_levels),
+            selectinload(Item.stock_movements)
+        ).where(Item.id == item_id)
+        
+        result = await self.session.execute(query)
+        item = result.scalar_one_or_none()
+        
+        if not item:
+            raise NotFoundError(f"Item with ID {item_id} not found")
+        
+        # Build units by status
+        units_by_status = UnitsByStatus()
+        inventory_unit_details = []
+        
+        # Get location data for units
+        location_ids = set()
+        for unit in item.inventory_units:
+            if unit.is_active:
+                location_ids.add(unit.location_id)
+        
+        # Fetch locations
+        locations_map = {}
+        if location_ids:
+            loc_query = select(Location).where(Location.id.in_(location_ids))
+            loc_result = await self.session.execute(loc_query)
+            locations = loc_result.scalars().all()
+            locations_map = {loc.id: loc.location_name for loc in locations}
+        
+        # Process inventory units
+        for unit in item.inventory_units:
+            if unit.is_active:
+                status = unit.status.lower()
+                if hasattr(units_by_status, status):
+                    setattr(units_by_status, status, getattr(units_by_status, status) + 1)
+                
+                unit_detail = InventoryUnitDetail(
+                    id=unit.id,
+                    unit_code=unit.unit_code,
+                    serial_number=unit.serial_number,
+                    status=unit.status,
+                    condition=unit.condition,
+                    location_id=unit.location_id,
+                    location_name=locations_map.get(unit.location_id, "Unknown"),
+                    purchase_date=unit.purchase_date,
+                    purchase_price=unit.purchase_price,
+                    warranty_expiry=unit.warranty_expiry,
+                    last_maintenance_date=unit.last_maintenance_date,
+                    next_maintenance_date=unit.next_maintenance_date,
+                    notes=unit.notes,
+                    created_at=unit.created_at,
+                    updated_at=unit.updated_at
+                )
+                inventory_unit_details.append(unit_detail)
+        
+        # Process stock levels by location
+        stock_by_location = []
+        total_on_hand = Decimal("0")
+        total_available = Decimal("0")
+        total_on_rent = Decimal("0")
+        
+        for stock_level in item.stock_levels:
+            if stock_level.is_active:
+                total_on_hand += stock_level.quantity_on_hand
+                total_available += stock_level.quantity_available
+                total_on_rent += stock_level.quantity_on_rent
+                
+                location_stock = LocationStockInfo(
+                    location_id=stock_level.location_id,
+                    location_name=locations_map.get(stock_level.location_id, "Unknown"),
+                    quantity_on_hand=stock_level.quantity_on_hand,
+                    quantity_available=stock_level.quantity_available,
+                    quantity_on_rent=stock_level.quantity_on_rent
+                )
+                stock_by_location.append(location_stock)
+        
+        # Get recent movements (last 10)
+        recent_movements = []
+        if item.stock_movements:
+            # Sort by created_at descending and take first 10
+            sorted_movements = sorted(
+                item.stock_movements,
+                key=lambda x: x.created_at,
+                reverse=True
+            )[:10]
+            
+            # Get user names if needed
+            user_ids = set()
+            for movement in sorted_movements:
+                if movement.created_by:
+                    user_ids.add(movement.created_by)
+            
+            # For now, we'll use user IDs as names
+            # In a real implementation, you'd fetch user names from the users tables
+            
+            for movement in sorted_movements:
+                recent_movement = RecentMovement(
+                    id=movement.id,
+                    movement_type=movement.movement_type,
+                    quantity_change=movement.quantity_change,
+                    reason=movement.reason,
+                    reference_type=movement.reference_type,
+                    reference_id=movement.reference_id,
+                    location_name=locations_map.get(movement.location_id, "Unknown"),
+                    created_at=movement.created_at,
+                    created_by_name=str(movement.created_by) if movement.created_by else None
+                )
+                recent_movements.append(recent_movement)
+        
+        # Determine stock status
+        if units_by_status.available == 0 and total_available == 0:
+            stock_status = "OUT_OF_STOCK"
+        elif item.is_low_stock():
+            stock_status = "LOW_STOCK"
+        else:
+            stock_status = "IN_STOCK"
+        
+        # Build detailed response
+        detailed = ItemInventoryDetailed(
+            id=item.id,
+            sku=item.sku,
+            item_name=item.item_name,
+            item_status=item.item_status,
+            brand_id=item.brand_id,
+            brand_name=item.brand.brand_name if item.brand else None,
+            category_id=item.category_id,
+            category_name=item.category.category_name if item.category else None,
+            unit_of_measurement_id=item.unit_of_measurement_id,
+            unit_of_measurement_name=item.unit_of_measurement.unit_name if item.unit_of_measurement else "Unknown",
+            description=item.description,
+            specifications=item.specifications,
+            model_number=item.model_number,
+            serial_number_required=item.serial_number_required,
+            warranty_period_days=item.warranty_period_days,
+            rental_rate_per_period=item.rental_rate_per_period,
+            rental_period=item.rental_period,
+            sale_price=item.sale_price,
+            purchase_price=item.purchase_price,
+            security_deposit=item.security_deposit,
+            is_rentable=item.is_rentable,
+            is_saleable=item.is_saleable,
+            total_units=len([u for u in item.inventory_units if u.is_active]),
+            units_by_status=units_by_status,
+            inventory_units=inventory_unit_details,
+            stock_by_location=stock_by_location,
+            total_quantity_on_hand=total_on_hand,
+            total_quantity_available=total_available,
+            total_quantity_on_rent=total_on_rent,
+            reorder_point=item.reorder_point,
+            stock_status=stock_status,
+            is_low_stock=item.is_low_stock(),
+            recent_movements=recent_movements,
+            is_active=item.is_active,
+            created_at=item.created_at,
+            updated_at=item.updated_at,
+            created_by=item.created_by,
+            updated_by=item.updated_by
+        )
+        
+        return detailed

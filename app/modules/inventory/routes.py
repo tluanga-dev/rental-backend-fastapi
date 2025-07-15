@@ -706,3 +706,54 @@ async def return_from_rent(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValidationError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
+# Item Inventory Overview and Detailed Endpoints
+
+@router.get("/items/overview", response_model=List[ItemInventoryOverview])
+async def get_items_inventory_overview(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    item_status: Optional[ItemStatus] = None,
+    brand_id: Optional[UUID] = None,
+    category_id: Optional[UUID] = None,
+    stock_status: Optional[str] = Query(None, regex="^(IN_STOCK|LOW_STOCK|OUT_OF_STOCK)$"),
+    is_rentable: Optional[bool] = None,
+    is_saleable: Optional[bool] = None,
+    search: Optional[str] = None,
+    sort_by: Optional[str] = Query(default="item_name", regex="^(item_name|sku|created_at|total_units|stock_status)$"),
+    sort_order: Optional[str] = Query(default="asc", regex="^(asc|desc)$"),
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get inventory overview for all items - optimized for table display."""
+    try:
+        params = ItemInventoryOverviewParams(
+            skip=skip,
+            limit=limit,
+            item_status=item_status,
+            brand_id=brand_id,
+            category_id=category_id,
+            stock_status=stock_status,
+            is_rentable=is_rentable,
+            is_saleable=is_saleable,
+            search=search,
+            sort_by=sort_by,
+            sort_order=sort_order
+        )
+        return await service.get_items_inventory_overview(params)
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
+@router.get("/items/{item_id}/detailed", response_model=ItemInventoryDetailed)
+async def get_item_inventory_detailed(
+    item_id: UUID,
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get detailed inventory information for a single item."""
+    try:
+        return await service.get_item_inventory_detailed(item_id)
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
