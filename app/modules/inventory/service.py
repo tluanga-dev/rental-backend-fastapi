@@ -24,7 +24,9 @@ from app.modules.inventory.schemas import (
     StockLevelCreate, StockLevelUpdate, StockLevelResponse,
     StockAdjustment, StockReservation, StockReservationRelease,
     InventoryReport, StockMovementResponse, StockMovementHistoryRequest,
-    StockMovementSummaryResponse
+    StockMovementSummaryResponse, ItemInventoryOverview, ItemInventoryDetailed,
+    UnitsByStatus, LocationStockInfo, InventoryUnitDetail, RecentMovement,
+    ItemInventoryOverviewParams
 )
 from app.shared.utils.sku_generator import SKUGenerator
 
@@ -1292,8 +1294,8 @@ class InventoryService:
                 sku=item.sku,
                 item_name=item.item_name,
                 item_status=item.item_status,
-                brand_name=item.brand.brand_name if item.brand else None,
-                category_name=item.category.category_name if item.category else None,
+                brand_name=item.brand.name if item.brand else None,
+                category_name=item.category.name if item.category else None,
                 rental_rate_per_period=item.rental_rate_per_period,
                 sale_price=item.sale_price,
                 is_rentable=item.is_rentable,
@@ -1474,11 +1476,11 @@ class InventoryService:
             item_name=item.item_name,
             item_status=item.item_status,
             brand_id=item.brand_id,
-            brand_name=item.brand.brand_name if item.brand else None,
+            brand_name=item.brand.name if item.brand else None,
             category_id=item.category_id,
-            category_name=item.category.category_name if item.category else None,
+            category_name=item.category.name if item.category else None,
             unit_of_measurement_id=item.unit_of_measurement_id,
-            unit_of_measurement_name=item.unit_of_measurement.unit_name if item.unit_of_measurement else "Unknown",
+            unit_of_measurement_name=item.unit_of_measurement.name if item.unit_of_measurement else "Unknown",
             description=item.description,
             specifications=item.specifications,
             model_number=item.model_number,

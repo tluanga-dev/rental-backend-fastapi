@@ -19,7 +19,8 @@ from app.modules.inventory.schemas import (
     StockLevelCreate, StockLevelUpdate, StockLevelResponse, StockLevelListResponse,
     StockAdjustment, StockReservation, StockReservationRelease,
     InventoryReport, StockMovementResponse, StockMovementHistoryRequest,
-    StockMovementSummaryResponse
+    StockMovementSummaryResponse, ItemInventoryOverview, ItemInventoryDetailed,
+    ItemInventoryOverviewParams
 )
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 
