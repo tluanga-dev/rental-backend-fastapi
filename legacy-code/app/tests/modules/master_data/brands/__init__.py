@@ -1,1 +1,0 @@
-# Brand module tests

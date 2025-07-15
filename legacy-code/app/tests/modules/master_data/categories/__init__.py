@@ -1,1 +1,0 @@
-# Category module tests
