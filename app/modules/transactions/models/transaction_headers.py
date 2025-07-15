@@ -115,14 +115,9 @@ class TransactionHeader(BaseModel):
     total_amount = Column(Numeric(15, 2), nullable=False, default=0, comment="Final total amount")
     paid_amount = Column(Numeric(15, 2), nullable=False, default=0, comment="Amount already paid")
     
-    # Rental-specific fields
-    rental_start_date = Column(Date, nullable=True, comment="Rental start date")
-    rental_end_date = Column(Date, nullable=True, comment="Rental end date")
-    rental_period = Column(Integer, nullable=True, comment="Rental period duration")
-    rental_period_unit = Column(Enum(RentalPeriodUnit), nullable=True, comment="Rental period unit")
+    # Rental-specific fields (moved to TransactionLine level)
     deposit_amount = Column(Numeric(15, 2), nullable=True, comment="Security deposit for rentals")
     deposit_paid = Column(Boolean, nullable=False, default=False, comment="Whether deposit has been paid")
-    current_rental_status = Column(Enum(RentalStatus), nullable=True, comment="Current rental status")
     customer_advance_balance = Column(Numeric(15, 2), nullable=False, default=0, comment="Customer advance payment balance")
     
     # Return handling
@@ -153,8 +148,6 @@ class TransactionHeader(BaseModel):
         Index("idx_customer_id", "customer_id"),
         Index("idx_location_id", "location_id"),
         Index("idx_reference_transaction", "reference_transaction_id"),
-        Index("idx_rental_dates", "rental_start_date", "rental_end_date"),
-        Index("idx_rental_status", "current_rental_status"),
         CheckConstraint("total_amount >= 0", name="check_positive_total"),
         CheckConstraint("paid_amount >= 0", name="check_positive_paid"),
         CheckConstraint("paid_amount <= total_amount", name="check_paid_not_exceed_total"),
@@ -190,17 +183,86 @@ class TransactionHeader(BaseModel):
     
     @property
     def rental_duration_days(self):
-        """Calculate rental duration in days."""
-        if self.rental_start_date and self.rental_end_date:
-            return (self.rental_end_date - self.rental_start_date).days
-        return 0
+        """Calculate rental duration in days from transaction lines."""
+        if not self.is_rental or not self.transaction_lines:
+            return 0
+        
+        # Get the maximum rental duration from all lines
+        max_duration = 0
+        for line in self.transaction_lines:
+            if line.rental_start_date and line.rental_end_date:
+                duration = (line.rental_end_date - line.rental_start_date).days
+                max_duration = max(max_duration, duration)
+        return max_duration
+    
+    @property
+    def rental_start_date(self):
+        """Get the earliest rental start date from transaction lines."""
+        if not self.is_rental or not self.transaction_lines:
+            return None
+        
+        start_dates = [line.rental_start_date for line in self.transaction_lines 
+                      if line.rental_start_date]
+        return min(start_dates) if start_dates else None
+    
+    @property
+    def rental_end_date(self):
+        """Get the latest rental end date from transaction lines."""
+        if not self.is_rental or not self.transaction_lines:
+            return None
+        
+        end_dates = [line.rental_end_date for line in self.transaction_lines 
+                    if line.rental_end_date]
+        return max(end_dates) if end_dates else None
+    
+    @property
+    def current_rental_status(self):
+        """Aggregate rental status from transaction lines."""
+        if not self.is_rental or not self.transaction_lines:
+            return None
+        
+        # Use RentalStatus enum directly
+        
+        # Get all line statuses
+        line_statuses = [line.current_rental_status for line in self.transaction_lines 
+                        if line.current_rental_status]
+        
+        if not line_statuses:
+            return None
+        
+        # Status aggregation logic:
+        # - If any line is LATE, transaction is LATE
+        # - If any line has PARTIAL_RETURN, transaction has partial returns
+        # - If all lines are COMPLETED, transaction is COMPLETED
+        # - Otherwise, transaction is ACTIVE
+        
+        if RentalStatus.LATE in line_statuses or RentalStatus.LATE_PARTIAL_RETURN in line_statuses:
+            if RentalStatus.PARTIAL_RETURN in line_statuses or RentalStatus.LATE_PARTIAL_RETURN in line_statuses:
+                return RentalStatus.LATE_PARTIAL_RETURN
+            return RentalStatus.LATE
+        
+        if RentalStatus.PARTIAL_RETURN in line_statuses:
+            return RentalStatus.PARTIAL_RETURN
+        
+        if all(status == RentalStatus.COMPLETED for status in line_statuses):
+            return RentalStatus.COMPLETED
+        
+        if RentalStatus.EXTENDED in line_statuses:
+            return RentalStatus.EXTENDED
+        
+        return RentalStatus.ACTIVE
     
     @property
     def is_overdue(self):
-        """Check if rental is overdue."""
-        if not self.is_rental or not self.rental_end_date:
+        """Check if rental is overdue based on line items."""
+        if not self.is_rental:
             return False
-        return self.rental_end_date < date.today()
+        
+        rental_end = self.rental_end_date
+        if not rental_end:
+            return False
+        
+        return rental_end < date.today()
     
     @property
     def days_overdue(self):

@@ -13,7 +13,10 @@ from uuid import uuid4
 from app.db.base import BaseModel, UUIDType
 
 if TYPE_CHECKING:
-    from app.modules.transactions.models.headers import TransactionHeader, RentalPeriodUnit
+    from app.modules.transactions.models.headers import TransactionHeader
+
+# Import enums directly to avoid circular imports
+from app.modules.transactions.models.transaction_headers import RentalPeriodUnit, RentalStatus
 
 
 # Line Item Type Enum
@@ -67,7 +70,8 @@ class TransactionLine(BaseModel):
     rental_start_date = Column(Date, nullable=True, comment="Item rental start date")
     rental_end_date = Column(Date, nullable=True, comment="Item rental end date")
     rental_period = Column(Integer, nullable=True, comment="Rental period for this item")
-    rental_period_unit = Column(String(10), nullable=True, comment="Rental period unit")  # Store as string to avoid circular import
+    rental_period_unit = Column(Enum(RentalPeriodUnit), nullable=True, comment="Rental period unit")
+    current_rental_status = Column(Enum(RentalStatus), nullable=True, comment="Current rental status for this item")
     daily_rate = Column(Numeric(10, 2), nullable=True, comment="Daily rental rate")
     
     # Inventory and fulfillment
@@ -102,6 +106,7 @@ class TransactionLine(BaseModel):
         Index("idx_status", "status"),
         Index("idx_fulfillment_status", "fulfillment_status"),
         Index("idx_rental_dates", "rental_start_date", "rental_end_date"),
+        Index("idx_rental_status", "current_rental_status"),
         UniqueConstraint("transaction_id", "line_number", name="uq_transaction_line_number"),
         CheckConstraint("quantity > 0", name="check_positive_quantity"),
         CheckConstraint("unit_price >= 0", name="check_non_negative_price"),
@@ -166,6 +171,29 @@ class TransactionLine(BaseModel):
         if not self.is_rental_overdue:
             return 0
         return (date.today() - self.rental_end_date).days
+    
+    @property
+    def is_active_rental(self):
+        """Check if this line represents an active rental."""
+        return (self.current_rental_status == RentalStatus.ACTIVE and 
+                self.rental_start_date and self.rental_end_date)
+    
+    @property
+    def is_completed_rental(self):
+        """Check if this rental line is completed."""
+        return self.current_rental_status == RentalStatus.COMPLETED
+    
+    @property
+    def is_late_rental(self):
+        """Check if this rental line is late."""
+        return (self.current_rental_status == RentalStatus.LATE or 
+                self.current_rental_status == RentalStatus.LATE_PARTIAL_RETURN)
+    
+    @property
+    def has_partial_return(self):
+        """Check if this rental line has partial returns."""
+        return (self.current_rental_status == RentalStatus.PARTIAL_RETURN or 
+                self.current_rental_status == RentalStatus.LATE_PARTIAL_RETURN)
     
     def calculate_line_total(self):
         """Calculate and update line total."""

@@ -31,26 +31,7 @@ class TransactionHeaderCreate(BaseModel):
         default=PaymentStatus.PENDING, description="Payment status"
     )
     reference_transaction_id: Optional[UUID] = Field(None, description="Reference transaction ID")
-    rental_start_date: Optional[date] = Field(None, description="Rental start date")
-    rental_end_date: Optional[date] = Field(None, description="Rental end date")
     notes: Optional[str] = Field(None, description="Additional notes")
-
-    @field_validator("rental_end_date")
-    @classmethod
-    def validate_rental_end_date(cls, v, info):
-        if v is not None and info.data.get("rental_start_date") is not None:
-            if v < info.data.get("rental_start_date"):
-                raise ValueError("Rental end date must be after start date")
-        return v
-
-    @model_validator(mode="after")
-    def validate_rental_dates_for_rental_type(self):
-        if self.transaction_type == TransactionType.RENTAL:
-            if not self.rental_start_date:
-                raise ValueError("Rental start date is required for rental transactions")
-            if not self.rental_end_date:
-                raise ValueError("Rental end date is required for rental transactions")
-        return self
 
 
 class TransactionHeaderUpdate(BaseModel):
@@ -64,17 +45,7 @@ class TransactionHeaderUpdate(BaseModel):
     status: Optional[TransactionStatus] = Field(None, description="Transaction status")
     payment_status: Optional[PaymentStatus] = Field(None, description="Payment status")
     reference_transaction_id: Optional[UUID] = Field(None, description="Reference transaction ID")
-    rental_start_date: Optional[date] = Field(None, description="Rental start date")
-    rental_end_date: Optional[date] = Field(None, description="Rental end date")
     notes: Optional[str] = Field(None, description="Additional notes")
-
-    @field_validator("rental_end_date")
-    @classmethod
-    def validate_rental_end_date(cls, v, info):
-        if v is not None and info.data.get("rental_start_date") is not None:
-            if v < info.data.get("rental_start_date"):
-                raise ValueError("Rental end date must be after start date")
-        return v
 
 
 class TransactionHeaderResponse(BaseModel):
@@ -98,9 +69,6 @@ class TransactionHeaderResponse(BaseModel):
     paid_amount: Decimal
     deposit_amount: Decimal
     reference_transaction_id: Optional[UUID]
-    rental_start_date: Optional[date]
-    rental_end_date: Optional[date]
-    current_rental_status: Optional[str]
     customer_advance_balance: Decimal
     actual_return_date: Optional[date]
     notes: Optional[str]
@@ -135,12 +103,6 @@ class TransactionHeaderResponse(BaseModel):
     def is_sale(self) -> bool:
         return self.transaction_type == TransactionType.SALE
 
-    @computed_field
-    @property
-    def rental_days(self) -> int:
-        if not self.is_rental or not self.rental_start_date or not self.rental_end_date:
-            return 0
-        return (self.rental_end_date - self.rental_start_date).days + 1
 
 
 class TransactionHeaderListResponse(BaseModel):
@@ -192,6 +154,7 @@ class TransactionLineCreate(BaseModel):
     rental_period_unit: Optional[RentalPeriodUnit] = Field(None, description="Rental period unit")
     rental_start_date: Optional[date] = Field(None, description="Rental start date")
     rental_end_date: Optional[date] = Field(None, description="Rental end date")
+    current_rental_status: Optional[RentalStatus] = Field(None, description="Current rental status")
     notes: Optional[str] = Field(None, description="Additional notes")
 
     @field_validator("item_id")
@@ -246,6 +209,7 @@ class TransactionLineUpdate(BaseModel):
     rental_period_unit: Optional[RentalPeriodUnit] = Field(None, description="Rental period unit")
     rental_start_date: Optional[date] = Field(None, description="Rental start date")
     rental_end_date: Optional[date] = Field(None, description="Rental end date")
+    current_rental_status: Optional[RentalStatus] = Field(None, description="Current rental status")
     notes: Optional[str] = Field(None, description="Additional notes")
 
     @field_validator("rental_end_date")
@@ -280,6 +244,7 @@ class TransactionLineResponse(BaseModel):
     rental_period_unit: Optional[RentalPeriodUnit]
     rental_start_date: Optional[date]
     rental_end_date: Optional[date]
+    current_rental_status: Optional[RentalStatus]
     returned_quantity: Decimal
     return_date: Optional[date]
     notes: Optional[str]
@@ -440,9 +405,6 @@ class TransactionWithLinesResponse(BaseModel):
     paid_amount: Decimal
     deposit_amount: Decimal
     reference_transaction_id: Optional[UUID]
-    rental_start_date: Optional[date]
-    rental_end_date: Optional[date]
-    current_rental_status: Optional[str]
     customer_advance_balance: Decimal
     actual_return_date: Optional[date]
     notes: Optional[str]
@@ -495,9 +457,6 @@ class TransactionHeaderWithLinesListResponse(BaseModel):
     paid_amount: Decimal
     deposit_amount: Decimal
     reference_transaction_id: Optional[UUID]
-    rental_start_date: Optional[date]
-    rental_end_date: Optional[date]
-    current_rental_status: Optional[str]
     customer_advance_balance: Decimal
     actual_return_date: Optional[date]
     notes: Optional[str]
