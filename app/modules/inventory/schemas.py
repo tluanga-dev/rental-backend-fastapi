@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator, computed_fie
 from uuid import UUID
 
 from app.modules.master_data.item_master.models import ItemStatus
-from app.modules.inventory.models import InventoryUnitStatus, InventoryUnitCondition
+from app.modules.inventory.models import InventoryUnitStatus, InventoryUnitCondition, MovementType, ReferenceType
 # Simplified approach - using string with pattern validation
 
 
@@ -113,48 +113,16 @@ class StockLevelCreate(BaseModel):
     """Schema for creating a new stock level."""
     item_id: UUID = Field(..., description="Item ID")
     location_id: UUID = Field(..., description="Location ID")
-    quantity_on_hand: str = Field(default="0", description="Current quantity on hand")
-    quantity_available: str = Field(default="0", description="Available quantity")
-    quantity_reserved: str = Field(default="0", description="Reserved quantity")
-    quantity_on_order: str = Field(default="0", description="Quantity on order")
-    minimum_level: str = Field(default="0", description="Minimum stock level")
-    maximum_level: str = Field(default="0", description="Maximum stock level")
-    reorder_point: str = Field(default="0", description="Reorder point")
-    
-    @field_validator('quantity_on_hand', 'quantity_available', 'quantity_reserved', 'quantity_on_order', 'minimum_level', 'maximum_level', 'reorder_point')
-    @classmethod
-    def validate_numeric_string(cls, v):
-        if v is not None and v != "":
-            try:
-                quantity = int(v)
-                if quantity < 0:
-                    raise ValueError("Quantity cannot be negative")
-            except ValueError:
-                raise ValueError("Must be a valid number")
-        return v
+    quantity_on_hand: Decimal = Field(default=Decimal("0"), ge=0, description="Current quantity on hand")
+    quantity_available: Decimal = Field(default=Decimal("0"), ge=0, description="Available quantity")
+    quantity_on_rent: Decimal = Field(default=Decimal("0"), ge=0, description="Quantity currently on rent")
 
 
 class StockLevelUpdate(BaseModel):
     """Schema for updating stock level."""
-    quantity_on_hand: Optional[str] = Field(None, description="Current quantity on hand")
-    quantity_available: Optional[str] = Field(None, description="Available quantity")
-    quantity_reserved: Optional[str] = Field(None, description="Reserved quantity")
-    quantity_on_order: Optional[str] = Field(None, description="Quantity on order")
-    minimum_level: Optional[str] = Field(None, description="Minimum stock level")
-    maximum_level: Optional[str] = Field(None, description="Maximum stock level")
-    reorder_point: Optional[str] = Field(None, description="Reorder point")
-    
-    @field_validator('quantity_on_hand', 'quantity_available', 'quantity_reserved', 'quantity_on_order', 'minimum_level', 'maximum_level', 'reorder_point')
-    @classmethod
-    def validate_numeric_string(cls, v):
-        if v is not None and v != "":
-            try:
-                quantity = int(v)
-                if quantity < 0:
-                    raise ValueError("Quantity cannot be negative")
-            except ValueError:
-                raise ValueError("Must be a valid number")
-        return v
+    quantity_on_hand: Optional[Decimal] = Field(None, ge=0, description="Current quantity on hand")
+    quantity_available: Optional[Decimal] = Field(None, ge=0, description="Available quantity")
+    quantity_on_rent: Optional[Decimal] = Field(None, ge=0, description="Quantity currently on rent")
 
 
 class StockLevelResponse(BaseModel):
@@ -164,31 +132,24 @@ class StockLevelResponse(BaseModel):
     id: UUID
     item_id: UUID
     location_id: UUID
-    quantity_on_hand: str
-    quantity_available: str
-    quantity_reserved: str
-    quantity_on_order: str
-    minimum_level: str
-    maximum_level: str
-    reorder_point: str
+    quantity_on_hand: Decimal
+    quantity_available: Decimal
+    quantity_on_rent: Decimal
     is_active: bool
     created_at: datetime
     updated_at: datetime
     
     @computed_field
     @property
-    def is_below_minimum(self) -> bool:
-        return int(self.quantity_on_hand) < int(self.minimum_level)
+    def total_allocated(self) -> Decimal:
+        """Total quantity allocated (available + on rent)."""
+        return self.quantity_available + self.quantity_on_rent
     
     @computed_field
     @property
-    def is_above_maximum(self) -> bool:
-        return int(self.quantity_on_hand) > int(self.maximum_level)
-    
-    @computed_field
-    @property
-    def needs_reorder(self) -> bool:
-        return int(self.quantity_on_hand) <= int(self.reorder_point)
+    def is_available_for_rent(self) -> bool:
+        """Check if any quantity is available for rent."""
+        return self.quantity_available > 0 and self.is_active
 
 
 class StockLevelListResponse(BaseModel):
@@ -198,20 +159,12 @@ class StockLevelListResponse(BaseModel):
     id: UUID
     item_id: UUID
     location_id: UUID
-    quantity_on_hand: str
-    quantity_available: str
-    quantity_reserved: str
-    minimum_level: str
-    maximum_level: str
-    reorder_point: str
+    quantity_on_hand: Decimal
+    quantity_available: Decimal
+    quantity_on_rent: Decimal
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    
-    @computed_field
-    @property
-    def needs_reorder(self) -> bool:
-        return int(self.quantity_on_hand) <= int(self.reorder_point)
 
 
 class StockAdjustment(BaseModel):
@@ -270,5 +223,110 @@ class InventoryUnitWithItemResponse(BaseModel):
     def full_display_name(self) -> str:
         """This will be populated by the service layer with item info."""
         return f"{self.unit_code}"
+
+
+# Stock Movement Schemas
+
+class StockMovementCreate(BaseModel):
+    """Schema for creating a stock movement record."""
+    stock_level_id: UUID = Field(..., description="Stock level ID")
+    movement_type: MovementType = Field(..., description="Type of movement")
+    reference_type: ReferenceType = Field(..., description="Type of reference")
+    reference_id: str = Field(..., max_length=100, description="External reference ID")
+    quantity_change: Decimal = Field(..., description="Quantity change (+/-)")
+    quantity_before: Decimal = Field(..., ge=0, description="Quantity before movement")
+    quantity_after: Decimal = Field(..., ge=0, description="Quantity after movement")
+    reason: str = Field(..., max_length=500, description="Reason for movement")
+    notes: Optional[str] = Field(None, description="Additional notes")
+    transaction_line_id: Optional[UUID] = Field(None, description="Transaction line reference")
+
+
+class StockMovementResponse(BaseModel):
+    """Schema for stock movement response."""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: UUID
+    stock_level_id: UUID
+    item_id: UUID
+    location_id: UUID
+    movement_type: MovementType
+    reference_type: ReferenceType
+    reference_id: Optional[str]
+    quantity_change: Decimal
+    quantity_before: Decimal
+    quantity_after: Decimal
+    reason: str
+    notes: Optional[str]
+    transaction_line_id: Optional[UUID]
+    created_at: datetime
+    updated_at: datetime
+    created_by: Optional[UUID]
+    is_active: bool
+    
+    @computed_field
+    @property
+    def is_increase(self) -> bool:
+        """Check if this movement increases stock."""
+        return self.quantity_change > 0
+    
+    @computed_field
+    @property
+    def is_decrease(self) -> bool:
+        """Check if this movement decreases stock."""
+        return self.quantity_change < 0
+    
+    @computed_field
+    @property
+    def display_name(self) -> str:
+        """Get movement display name."""
+        direction = "+" if self.quantity_change >= 0 else ""
+        return f"{self.movement_type.value}: {direction}{self.quantity_change}"
+
+
+class StockMovementListResponse(BaseModel):
+    """Schema for stock movement list response."""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: UUID
+    movement_type: MovementType
+    reference_type: ReferenceType
+    reference_id: Optional[str]
+    quantity_change: Decimal
+    reason: str
+    created_at: datetime
+    created_by: Optional[UUID]
+
+
+class StockMovementHistoryRequest(BaseModel):
+    """Schema for requesting stock movement history."""
+    stock_level_id: Optional[UUID] = Field(None, description="Filter by stock level ID")
+    item_id: Optional[UUID] = Field(None, description="Filter by item ID")
+    location_id: Optional[UUID] = Field(None, description="Filter by location ID")
+    movement_type: Optional[MovementType] = Field(None, description="Filter by movement type")
+    reference_type: Optional[ReferenceType] = Field(None, description="Filter by reference type")
+    start_date: Optional[datetime] = Field(None, description="Start date for filtering")
+    end_date: Optional[datetime] = Field(None, description="End date for filtering")
+    skip: int = Field(default=0, ge=0, description="Number of records to skip")
+    limit: int = Field(default=100, ge=1, le=1000, description="Number of records to return")
+
+
+class StockMovementSummaryResponse(BaseModel):
+    """Schema for stock movement summary response."""
+    total_movements: int
+    total_increases: Decimal
+    total_decreases: Decimal
+    net_change: Decimal
+    movement_types: dict = Field(default_factory=dict)
+    
+    
+class StockMovementReportRequest(BaseModel):
+    """Schema for stock movement report request."""
+    item_id: Optional[UUID] = Field(None, description="Filter by item ID")
+    location_id: Optional[UUID] = Field(None, description="Filter by location ID")
+    start_date: Optional[datetime] = Field(None, description="Start date for report")
+    end_date: Optional[datetime] = Field(None, description="End date for report")
+    movement_type: Optional[MovementType] = Field(None, description="Filter by movement type")
+    include_summary: bool = Field(default=True, description="Include summary statistics")
+    include_details: bool = Field(default=False, description="Include detailed movements")
 
 

@@ -8,7 +8,8 @@ from sqlalchemy.orm import selectinload, joinedload
 
 from app.modules.master_data.item_master.models import Item, ItemStatus
 from app.modules.inventory.models import (
-    InventoryUnit, StockLevel, InventoryUnitStatus, InventoryUnitCondition
+    InventoryUnit, StockLevel, StockMovement, InventoryUnitStatus, InventoryUnitCondition,
+    MovementType, ReferenceType
 )
 from app.modules.master_data.item_master.schemas import ItemCreate, ItemUpdate
 from app.modules.inventory.schemas import (
@@ -622,3 +623,161 @@ class StockLevelRepository:
         stock_level.is_active = False
         await self.session.commit()
         return True
+
+
+class StockMovementRepository:
+    """Repository for StockMovement operations."""
+    
+    def __init__(self, session: AsyncSession):
+        self.session = session
+    
+    async def create(self, movement_data: dict) -> StockMovement:
+        """Create a new stock movement record."""
+        movement = StockMovement(**movement_data)
+        self.session.add(movement)
+        await self.session.commit()
+        await self.session.refresh(movement)
+        return movement
+    
+    async def get_by_id(self, movement_id: UUID) -> Optional[StockMovement]:
+        """Get stock movement by ID."""
+        query = select(StockMovement).where(StockMovement.id == movement_id)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+    
+    async def get_by_stock_level(
+        self,
+        stock_level_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+        active_only: bool = True
+    ) -> List[StockMovement]:
+        """Get stock movements for a specific stock level."""
+        query = select(StockMovement).where(StockMovement.stock_level_id == stock_level_id)
+        
+        if active_only:
+            query = query.where(StockMovement.is_active == True)
+        
+        query = query.order_by(desc(StockMovement.created_at)).offset(skip).limit(limit)
+        
+        result = await self.session.execute(query)
+        return result.scalars().all()
+    
+    async def get_by_item(
+        self,
+        item_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+        movement_type: Optional[MovementType] = None,
+        active_only: bool = True
+    ) -> List[StockMovement]:
+        """Get stock movements for a specific item."""
+        query = select(StockMovement).where(StockMovement.item_id == item_id)
+        
+        if movement_type:
+            query = query.where(StockMovement.movement_type == movement_type.value)
+        
+        if active_only:
+            query = query.where(StockMovement.is_active == True)
+        
+        query = query.order_by(desc(StockMovement.created_at)).offset(skip).limit(limit)
+        
+        result = await self.session.execute(query)
+        return result.scalars().all()
+    
+    async def get_by_reference(
+        self,
+        reference_type: ReferenceType,
+        reference_id: str,
+        active_only: bool = True
+    ) -> List[StockMovement]:
+        """Get stock movements by reference."""
+        query = select(StockMovement).where(
+            and_(
+                StockMovement.reference_type == reference_type.value,
+                StockMovement.reference_id == reference_id
+            )
+        )
+        
+        if active_only:
+            query = query.where(StockMovement.is_active == True)
+        
+        query = query.order_by(desc(StockMovement.created_at))
+        
+        result = await self.session.execute(query)
+        return result.scalars().all()
+    
+    async def get_movements_by_date_range(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        item_id: Optional[UUID] = None,
+        location_id: Optional[UUID] = None,
+        movement_type: Optional[MovementType] = None,
+        active_only: bool = True
+    ) -> List[StockMovement]:
+        """Get stock movements within a date range with optional filters."""
+        query = select(StockMovement).where(
+            and_(
+                StockMovement.created_at >= start_date,
+                StockMovement.created_at <= end_date
+            )
+        )
+        
+        if item_id:
+            query = query.where(StockMovement.item_id == item_id)
+        
+        if location_id:
+            query = query.where(StockMovement.location_id == location_id)
+        
+        if movement_type:
+            query = query.where(StockMovement.movement_type == movement_type.value)
+        
+        if active_only:
+            query = query.where(StockMovement.is_active == True)
+        
+        query = query.order_by(desc(StockMovement.created_at))
+        
+        result = await self.session.execute(query)
+        return result.scalars().all()
+    
+    async def get_movement_summary(
+        self,
+        item_id: UUID,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> Dict[str, Any]:
+        """Get movement summary for an item."""
+        query = select(StockMovement).where(StockMovement.item_id == item_id)
+        
+        if start_date:
+            query = query.where(StockMovement.created_at >= start_date)
+        
+        if end_date:
+            query = query.where(StockMovement.created_at <= end_date)
+        
+        query = query.where(StockMovement.is_active == True)
+        
+        result = await self.session.execute(query)
+        movements = result.scalars().all()
+        
+        summary = {
+            "total_movements": len(movements),
+            "total_increases": sum(m.quantity_change for m in movements if m.quantity_change > 0),
+            "total_decreases": abs(sum(m.quantity_change for m in movements if m.quantity_change < 0)),
+            "net_change": sum(m.quantity_change for m in movements),
+            "movement_types": {}
+        }
+        
+        # Count by movement type
+        for movement in movements:
+            movement_type = movement.movement_type
+            if movement_type not in summary["movement_types"]:
+                summary["movement_types"][movement_type] = {
+                    "count": 0,
+                    "total_quantity": Decimal("0")
+                }
+            summary["movement_types"][movement_type]["count"] += 1
+            summary["movement_types"][movement_type]["total_quantity"] += movement.quantity_change
+        
+        return summary

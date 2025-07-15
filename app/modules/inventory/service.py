@@ -8,10 +8,11 @@ from app.core.errors import NotFoundError, ValidationError, ConflictError
 from app.modules.master_data.item_master.models import Item, ItemStatus
 from app.modules.master_data.locations.models import Location
 from app.modules.inventory.models import (
-    InventoryUnit, StockLevel, InventoryUnitStatus, InventoryUnitCondition
+    InventoryUnit, StockLevel, StockMovement, InventoryUnitStatus, InventoryUnitCondition,
+    MovementType, ReferenceType
 )
 from app.modules.inventory.repository import (
-    ItemRepository, InventoryUnitRepository, StockLevelRepository
+    ItemRepository, InventoryUnitRepository, StockLevelRepository, StockMovementRepository
 )
 from app.modules.master_data.locations.repository import LocationRepository
 from app.modules.master_data.item_master.schemas import (
@@ -22,7 +23,8 @@ from app.modules.inventory.schemas import (
     InventoryUnitCreate, InventoryUnitUpdate, InventoryUnitResponse,
     StockLevelCreate, StockLevelUpdate, StockLevelResponse,
     StockAdjustment, StockReservation, StockReservationRelease,
-    InventoryReport
+    InventoryReport, StockMovementResponse, StockMovementHistoryRequest,
+    StockMovementSummaryResponse
 )
 from app.shared.utils.sku_generator import SKUGenerator
 
@@ -35,6 +37,7 @@ class InventoryService:
         self.item_repository = ItemRepository(session)
         self.inventory_unit_repository = InventoryUnitRepository(session)
         self.stock_level_repository = StockLevelRepository(session)
+        self.stock_movement_repository = StockMovementRepository(session)
         self.location_repository = LocationRepository(session)
         self.sku_generator = SKUGenerator(session)
     
@@ -821,6 +824,8 @@ class InventoryService:
             location_id=location_id
         )
         
+        quantity_before = Decimal("0")
+        
         if not stock_level:
             if quantity_change < 0:
                 raise ValidationError("Cannot remove from non-existent stock")
@@ -830,31 +835,34 @@ class InventoryService:
                 item_id=item_id,
                 location_id=location_id,
                 quantity_on_hand=quantity_change,
-                quantity_available=quantity_change,
-                quantity_reserved=Decimal("0"),
-                reorder_point=Decimal("0"),
-                reorder_quantity=Decimal("0")
+                quantity_available=quantity_change
             )
             
             stock_level = await self.stock_level_repository.create(stock_data)
+            quantity_before = Decimal("0")
         else:
             # Update existing stock
-            new_quantity = stock_level.quantity_on_hand + quantity_change
-            if new_quantity < 0:
-                raise ValidationError(f"Insufficient stock. Available: {stock_level.quantity_on_hand}")
-            
-            stock_level.quantity_on_hand = new_quantity
-            stock_level.quantity_available = new_quantity - stock_level.quantity_reserved
+            quantity_before = stock_level.quantity_on_hand
+            stock_level.adjust_quantity(quantity_change)
             
             await self.session.commit()
             await self.session.refresh(stock_level)
         
-        # Create stock movement record (would be implemented with a stock movement table)
+        quantity_after = stock_level.quantity_on_hand
+        
+        # Determine movement type based on transaction type
+        movement_type = self._map_transaction_to_movement_type(transaction_type)
+        
+        # Create stock movement record
         await self._create_stock_movement_record(
             stock_level_id=stock_level.id,
-            movement_type=transaction_type,
-            quantity=quantity_change,
+            movement_type=movement_type,
+            quantity_change=quantity_change,
+            quantity_before=quantity_before,
+            quantity_after=quantity_after,
+            reference_type=ReferenceType.TRANSACTION,
             reference_id=reference_id,
+            reason=f"{transaction_type} - {notes or 'Stock adjustment'}",
             notes=notes
         )
         
@@ -939,24 +947,267 @@ class InventoryService:
         self,
         stock_level_id: UUID,
         movement_type: str,
-        quantity: Decimal,
+        quantity_change: Decimal,
+        quantity_before: Decimal,
+        quantity_after: Decimal,
+        reference_type: ReferenceType,
         reference_id: str,
-        notes: Optional[str] = None
-    ) -> None:
+        reason: str,
+        notes: Optional[str] = None,
+        transaction_line_id: Optional[UUID] = None,
+        created_by: Optional[str] = None
+    ) -> StockMovement:
         """
         Create a stock movement record for audit trail.
         
-        In a production system, this would create records in a stock_movements table.
-        For now, this is a placeholder implementation.
-        """
-        # This would create a record in a stock_movements table
-        # For now, we'll just log the movement
-        from app.core.logger import logger
+        Args:
+            stock_level_id: ID of the stock level being modified
+            movement_type: Type of movement (from MovementType enum)
+            quantity_change: Amount of change (+/-)
+            quantity_before: Quantity before the movement
+            quantity_after: Quantity after the movement
+            reference_type: Type of reference (from ReferenceType enum)
+            reference_id: External reference ID
+            reason: Human-readable reason for the movement
+            notes: Additional notes
+            transaction_line_id: Optional transaction line reference
+            created_by: User who created the movement
         
+        Returns:
+            The created stock movement record
+        """
+        # Get stock level to extract item_id and location_id
+        stock_level = await self.stock_level_repository.get_by_id(stock_level_id)
+        if not stock_level:
+            raise NotFoundError(f"Stock level with ID {stock_level_id} not found")
+        
+        # Create movement data
+        movement_data = {
+            "stock_level_id": stock_level_id,
+            "item_id": stock_level.item_id,
+            "location_id": stock_level.location_id,
+            "movement_type": movement_type,
+            "reference_type": reference_type.value,
+            "reference_id": reference_id,
+            "quantity_change": quantity_change,
+            "quantity_before": quantity_before,
+            "quantity_after": quantity_after,
+            "reason": reason,
+            "notes": notes,
+            "transaction_line_id": transaction_line_id,
+            "created_by": created_by
+        }
+        
+        # Create the movement record
+        movement = await self.stock_movement_repository.create(movement_data)
+        
+        # Log the movement for debugging
+        from app.core.logger import logger
         logger.info(
-            f"Stock movement: {movement_type} - "
+            f"Stock movement created: {movement_type} - "
             f"Stock Level: {stock_level_id}, "
-            f"Quantity: {quantity}, "
-            f"Reference: {reference_id}, "
-            f"Notes: {notes or 'None'}"
+            f"Change: {quantity_change}, "
+            f"Before: {quantity_before}, After: {quantity_after}, "
+            f"Reference: {reference_type.value}:{reference_id}"
         )
+        
+        return movement
+    
+    def _map_transaction_to_movement_type(self, transaction_type: str) -> str:
+        """Map transaction type to movement type."""
+        mapping = {
+            "RENTAL_OUT": MovementType.RENTAL_OUT.value,
+            "RENTAL_RETURN": MovementType.RENTAL_RETURN.value,
+            "SALE": MovementType.SALE.value,
+            "PURCHASE": MovementType.PURCHASE.value,
+            "ADJUSTMENT": MovementType.ADJUSTMENT_POSITIVE.value,
+            "DAMAGE": MovementType.DAMAGE_LOSS.value,
+            "TRANSFER_IN": MovementType.TRANSFER_IN.value,
+            "TRANSFER_OUT": MovementType.TRANSFER_OUT.value,
+        }
+        return mapping.get(transaction_type, MovementType.SYSTEM_CORRECTION.value)
+    
+    # Stock Movement operations
+    async def get_stock_movements_by_stock_level(
+        self,
+        stock_level_id: UUID,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[StockMovementResponse]:
+        """Get stock movements for a specific stock level."""
+        movements = await self.stock_movement_repository.get_by_stock_level(
+            stock_level_id=stock_level_id,
+            skip=skip,
+            limit=limit
+        )
+        return [StockMovementResponse.model_validate(movement) for movement in movements]
+    
+    async def get_stock_movements_by_item(
+        self,
+        item_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+        movement_type: Optional[MovementType] = None
+    ) -> List[StockMovementResponse]:
+        """Get stock movements for a specific item."""
+        movements = await self.stock_movement_repository.get_by_item(
+            item_id=item_id,
+            skip=skip,
+            limit=limit,
+            movement_type=movement_type
+        )
+        return [StockMovementResponse.model_validate(movement) for movement in movements]
+    
+    async def get_stock_movements_by_reference(
+        self,
+        reference_type: ReferenceType,
+        reference_id: str
+    ) -> List[StockMovementResponse]:
+        """Get stock movements by reference."""
+        movements = await self.stock_movement_repository.get_by_reference(
+            reference_type=reference_type,
+            reference_id=reference_id
+        )
+        return [StockMovementResponse.model_validate(movement) for movement in movements]
+    
+    async def get_stock_movements_by_date_range(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        item_id: Optional[UUID] = None,
+        location_id: Optional[UUID] = None,
+        movement_type: Optional[MovementType] = None
+    ) -> List[StockMovementResponse]:
+        """Get stock movements within a date range."""
+        movements = await self.stock_movement_repository.get_movements_by_date_range(
+            start_date=start_date,
+            end_date=end_date,
+            item_id=item_id,
+            location_id=location_id,
+            movement_type=movement_type
+        )
+        return [StockMovementResponse.model_validate(movement) for movement in movements]
+    
+    async def get_stock_movement_summary(
+        self,
+        item_id: UUID,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> StockMovementSummaryResponse:
+        """Get movement summary for an item."""
+        summary = await self.stock_movement_repository.get_movement_summary(
+            item_id=item_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+        return StockMovementSummaryResponse.model_validate(summary)
+    
+    async def create_manual_stock_movement(
+        self,
+        stock_level_id: UUID,
+        movement_type: MovementType,
+        quantity_change: Decimal,
+        reason: str,
+        notes: Optional[str] = None,
+        created_by: Optional[str] = None
+    ) -> StockMovementResponse:
+        """Create a manual stock movement record."""
+        # Get current stock level
+        stock_level = await self.stock_level_repository.get_by_id(stock_level_id)
+        if not stock_level:
+            raise NotFoundError(f"Stock level with ID {stock_level_id} not found")
+        
+        quantity_before = stock_level.quantity_on_hand
+        
+        # Update stock level
+        stock_level.adjust_quantity(quantity_change, updated_by=created_by)
+        await self.session.commit()
+        await self.session.refresh(stock_level)
+        
+        quantity_after = stock_level.quantity_on_hand
+        
+        # Create movement record
+        movement = await self._create_stock_movement_record(
+            stock_level_id=stock_level_id,
+            movement_type=movement_type.value,
+            quantity_change=quantity_change,
+            quantity_before=quantity_before,
+            quantity_after=quantity_after,
+            reference_type=ReferenceType.MANUAL_ADJUSTMENT,
+            reference_id=f"MANUAL_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+            reason=reason,
+            notes=notes,
+            created_by=created_by
+        )
+        
+        return StockMovementResponse.model_validate(movement)
+    
+    async def rent_out_stock(
+        self,
+        stock_level_id: UUID,
+        quantity: Decimal,
+        transaction_id: str,
+        updated_by: Optional[str] = None
+    ) -> StockMovementResponse:
+        """Move stock from available to on rent."""
+        # Get current stock level
+        stock_level = await self.stock_level_repository.get_by_id(stock_level_id)
+        if not stock_level:
+            raise NotFoundError(f"Stock level with ID {stock_level_id} not found")
+        
+        quantity_before = stock_level.quantity_available
+        
+        # Move quantity from available to on rent
+        stock_level.rent_out_quantity(quantity, updated_by=updated_by)
+        await self.session.commit()
+        await self.session.refresh(stock_level)
+        
+        # Create movement record
+        movement = await self._create_stock_movement_record(
+            stock_level_id=stock_level_id,
+            movement_type=MovementType.RENTAL_OUT.value,
+            quantity_change=-quantity,  # Negative because it's leaving available
+            quantity_before=quantity_before,
+            quantity_after=stock_level.quantity_available,
+            reference_type=ReferenceType.TRANSACTION,
+            reference_id=transaction_id,
+            reason=f"Rented out {quantity} units",
+            created_by=updated_by
+        )
+        
+        return StockMovementResponse.model_validate(movement)
+    
+    async def return_from_rent(
+        self,
+        stock_level_id: UUID,
+        quantity: Decimal,
+        transaction_id: str,
+        updated_by: Optional[str] = None
+    ) -> StockMovementResponse:
+        """Move stock from on rent back to available."""
+        # Get current stock level
+        stock_level = await self.stock_level_repository.get_by_id(stock_level_id)
+        if not stock_level:
+            raise NotFoundError(f"Stock level with ID {stock_level_id} not found")
+        
+        quantity_before = stock_level.quantity_available
+        
+        # Move quantity from on rent to available
+        stock_level.return_from_rent(quantity, updated_by=updated_by)
+        await self.session.commit()
+        await self.session.refresh(stock_level)
+        
+        # Create movement record
+        movement = await self._create_stock_movement_record(
+            stock_level_id=stock_level_id,
+            movement_type=MovementType.RENTAL_RETURN.value,
+            quantity_change=quantity,  # Positive because it's returning to available
+            quantity_before=quantity_before,
+            quantity_after=stock_level.quantity_available,
+            reference_type=ReferenceType.TRANSACTION,
+            reference_id=transaction_id,
+            reason=f"Returned {quantity} units from rent",
+            created_by=updated_by
+        )
+        
+        return StockMovementResponse.model_validate(movement)

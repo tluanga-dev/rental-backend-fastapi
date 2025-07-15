@@ -438,6 +438,45 @@ class RentalReturnProcessor(ReturnProcessor):
                     condition=item.condition_on_return,
                     status=status
                 )
+            
+            # Move stock from on rent back to available for all returns
+            try:
+                # Get stock level for this item/location
+                stock_level = await self.inventory_service.stock_level_repository.get_by_item_location(
+                    line.item_id, return_txn.location_id
+                )
+                
+                if stock_level:
+                    from decimal import Decimal
+                    # Move quantity from on rent back to available
+                    await self.inventory_service.return_from_rent(
+                        stock_level_id=stock_level.id,
+                        quantity=Decimal(str(item.return_quantity)),
+                        transaction_id=str(return_txn.id)
+                    )
+                    
+                    self.logger.log_debug_info("Stock returned from rent", {
+                        "item_id": str(line.item_id),
+                        "quantity": item.return_quantity,
+                        "return_transaction_id": str(return_txn.id),
+                        "stock_level_id": str(stock_level.id),
+                        "condition": item.condition_on_return
+                    })
+                else:
+                    # Log warning if no stock level found
+                    self.logger.log_debug_info("No stock level found for rental return", {
+                        "item_id": str(line.item_id),
+                        "location_id": str(return_txn.location_id),
+                        "quantity": item.return_quantity
+                    })
+                    
+            except Exception as stock_error:
+                # Log the error but don't fail the return
+                self.logger.log_debug_info("Error updating stock for rental return", {
+                    "item_id": str(line.item_id),
+                    "error": str(stock_error),
+                    "return_transaction_id": str(return_txn.id)
+                })
     
     async def calculate_financials(
         self, 

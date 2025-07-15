@@ -1154,9 +1154,47 @@ class TransactionService:
             transaction.discount_amount = discount_total
             transaction.total_amount = total_amount
 
-            # Commit transaction
+            # Commit transaction first
             await self.session.commit()
             await self.session.refresh(transaction)
+            
+            # Update stock levels for rented items (move from available to on rent)
+            for item in rental_data.items:
+                try:
+                    # Get stock level for this item/location
+                    stock_level = await self.inventory_service.stock_level_repository.get_by_item_location(
+                        item.item_id, rental_data.location_id
+                    )
+                    
+                    if stock_level:
+                        # Move quantity from available to on rent
+                        await self.inventory_service.rent_out_stock(
+                            stock_level_id=stock_level.id,
+                            quantity=Decimal(str(item.quantity)),
+                            transaction_id=str(transaction.id)
+                        )
+                        
+                        self.logger.log_debug_info("Stock moved to rent", {
+                            "item_id": str(item.item_id),
+                            "quantity": item.quantity,
+                            "transaction_id": str(transaction.id),
+                            "stock_level_id": str(stock_level.id)
+                        })
+                    else:
+                        # Log warning if no stock level found
+                        self.logger.log_debug_info("No stock level found for rental", {
+                            "item_id": str(item.item_id),
+                            "location_id": str(rental_data.location_id),
+                            "quantity": item.quantity
+                        })
+                        
+                except Exception as stock_error:
+                    # Log the error but don't fail the transaction
+                    self.logger.log_debug_info("Error updating stock for rental", {
+                        "item_id": str(item.item_id),
+                        "error": str(stock_error),
+                        "transaction_id": str(transaction.id)
+                    })
 
             # Get the complete transaction with lines for response
             result = await self.get_transaction_with_lines(transaction.id)
@@ -1193,53 +1231,58 @@ class TransactionService:
                 # Log existing stock found
                 existing_stock_data = {
                     "id": str(existing_stock.id),
-                    "quantity_on_hand": existing_stock.quantity_on_hand,
-                    "quantity_available": existing_stock.quantity_available,
-                    "quantity_reserved": existing_stock.quantity_reserved
+                    "quantity_on_hand": str(existing_stock.quantity_on_hand),
+                    "quantity_available": str(existing_stock.quantity_available),
+                    "quantity_on_rent": str(existing_stock.quantity_on_rent)
                 }
                 self.logger.log_item_stock_processing(str(item.item_id), item.quantity, existing_stock_data)
                 
-                # Update existing stock level - increment quantities
-                old_quantity = existing_stock.quantity_on_hand
-                existing_stock.adjust_quantity(item.quantity)
-                self.logger.log_debug_info("Stock Quantity Adjusted", {
+                # Update stock level using inventory service with stock movement tracking
+                await self.inventory_service.adjust_stock_level(
+                    item_id=item.item_id,
+                    location_id=purchase_data.location_id,
+                    quantity_change=item.quantity,
+                    transaction_type="PURCHASE",
+                    reference_id=str(transaction.id),
+                    notes=f"Purchase transaction - Condition: {item.condition}"
+                )
+                
+                self.logger.log_debug_info("Stock Quantity Adjusted with Movement Tracking", {
                     "item_id": str(item.item_id),
-                    "old_quantity": old_quantity,
                     "added_quantity": item.quantity,
-                    "new_quantity": existing_stock.quantity_on_hand
+                    "transaction_id": str(transaction.id)
                 })
-                # No commit here - will be committed with the main transaction
             else:
                 # Log new stock creation
                 self.logger.log_item_stock_processing(str(item.item_id), item.quantity, None)
                 
-                # Create new stock level with purchased quantity
+                # Create new stock level with purchased quantity using inventory service
+                from decimal import Decimal
                 stock_data = StockLevelCreate(
                     item_id=item.item_id,
                     location_id=purchase_data.location_id,
-                    quantity_on_hand=str(item.quantity),
-                    quantity_available=str(item.quantity),
-                    quantity_reserved="0",
-                    quantity_on_order="0",
-                    minimum_level="0",
-                    maximum_level="0",
-                    reorder_point="0"
+                    quantity_on_hand=Decimal(str(item.quantity)),
+                    quantity_available=Decimal(str(item.quantity)),
+                    quantity_on_rent=Decimal("0")
                 )
                 
                 self.logger.log_stock_level_creation(stock_data.model_dump())
                 
-                # Create the stock level record directly without committing
-                stock_level = StockLevel(
-                    item_id=str(stock_data.item_id),
-                    location_id=str(stock_data.location_id),
-                    quantity_on_hand=stock_data.quantity_on_hand,
-                    quantity_available=stock_data.quantity_available,
-                    quantity_reserved=stock_data.quantity_reserved,
-                    quantity_on_order=stock_data.quantity_on_order,
-                    minimum_level=stock_data.minimum_level,
-                    maximum_level=stock_data.maximum_level,
-                    reorder_point=stock_data.reorder_point
+                # Create the stock level using inventory service to ensure proper tracking
+                created_stock = await self.inventory_service.stock_level_repository.create(stock_data)
+                
+                # Now create the initial stock movement record for the purchase
+                from app.modules.inventory.models import ReferenceType
+                await self.inventory_service._create_stock_movement_record(
+                    stock_level_id=created_stock.id,
+                    movement_type="PURCHASE",
+                    quantity_change=Decimal(str(item.quantity)),
+                    quantity_before=Decimal("0"),
+                    quantity_after=Decimal(str(item.quantity)),
+                    reference_type=ReferenceType.TRANSACTION,
+                    reference_id=str(transaction.id),
+                    reason=f"Initial purchase - Condition: {item.condition}",
+                    notes=f"Purchase transaction - Condition: {item.condition}"
                 )
-                self.session.add(stock_level)
-                self.logger.log_session_operation(f"Stock level added to session for item {item.item_id}")
-                # No commit here - will be committed with the main transaction
+                
+                self.logger.log_session_operation(f"Stock level created with movement tracking for item {item.item_id}")

@@ -1,12 +1,14 @@
 from typing import List, Optional
 from uuid import UUID
+from datetime import datetime
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.dependencies import get_session
 from app.modules.inventory.service import InventoryService
 from app.modules.master_data.item_master.models import ItemStatus
-from app.modules.inventory.models import InventoryUnitStatus, InventoryUnitCondition
+from app.modules.inventory.models import InventoryUnitStatus, InventoryUnitCondition, MovementType, ReferenceType
 from app.modules.master_data.item_master.schemas import (
     ItemCreate, ItemUpdate, ItemResponse, ItemListResponse, ItemWithInventoryResponse,
     SKUGenerationRequest, SKUGenerationResponse, SKUBulkGenerationResponse
@@ -16,7 +18,8 @@ from app.modules.inventory.schemas import (
     InventoryUnitStatusUpdate,
     StockLevelCreate, StockLevelUpdate, StockLevelResponse, StockLevelListResponse,
     StockAdjustment, StockReservation, StockReservationRelease,
-    InventoryReport
+    InventoryReport, StockMovementResponse, StockMovementHistoryRequest,
+    StockMovementSummaryResponse
 )
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 
@@ -543,3 +546,163 @@ async def get_location_stock_levels(
         return await service.get_stock_levels(location_id=location_id)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+# Stock Movement Endpoints
+
+@router.get("/stock/{stock_level_id}/movements", response_model=List[StockMovementResponse])
+async def get_stock_level_movements(
+    stock_level_id: UUID,
+    skip: int = Query(default=0, ge=0, description="Number of records to skip"),
+    limit: int = Query(default=100, ge=1, le=1000, description="Number of records to return"),
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get stock movements for a specific stock level."""
+    try:
+        return await service.get_stock_movements_by_stock_level(
+            stock_level_id=stock_level_id,
+            skip=skip,
+            limit=limit
+        )
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/items/{item_id}/movements", response_model=List[StockMovementResponse])
+async def get_item_movements(
+    item_id: UUID,
+    skip: int = Query(default=0, ge=0, description="Number of records to skip"),
+    limit: int = Query(default=100, ge=1, le=1000, description="Number of records to return"),
+    movement_type: Optional[MovementType] = Query(default=None, description="Filter by movement type"),
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get stock movements for a specific item."""
+    try:
+        return await service.get_stock_movements_by_item(
+            item_id=item_id,
+            skip=skip,
+            limit=limit,
+            movement_type=movement_type
+        )
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/movements/reference/{reference_type}/{reference_id}", response_model=List[StockMovementResponse])
+async def get_movements_by_reference(
+    reference_type: ReferenceType,
+    reference_id: str,
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get stock movements by reference."""
+    try:
+        return await service.get_stock_movements_by_reference(
+            reference_type=reference_type,
+            reference_id=reference_id
+        )
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/movements/range", response_model=List[StockMovementResponse])
+async def get_movements_by_date_range(
+    start_date: datetime = Query(..., description="Start date"),
+    end_date: datetime = Query(..., description="End date"),
+    item_id: Optional[UUID] = Query(default=None, description="Filter by item ID"),
+    location_id: Optional[UUID] = Query(default=None, description="Filter by location ID"),
+    movement_type: Optional[MovementType] = Query(default=None, description="Filter by movement type"),
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get stock movements within a date range."""
+    try:
+        return await service.get_stock_movements_by_date_range(
+            start_date=start_date,
+            end_date=end_date,
+            item_id=item_id,
+            location_id=location_id,
+            movement_type=movement_type
+        )
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/items/{item_id}/movements/summary", response_model=StockMovementSummaryResponse)
+async def get_item_movement_summary(
+    item_id: UUID,
+    start_date: Optional[datetime] = Query(default=None, description="Start date for summary"),
+    end_date: Optional[datetime] = Query(default=None, description="End date for summary"),
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get movement summary for an item."""
+    try:
+        return await service.get_stock_movement_summary(
+            item_id=item_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post("/stock/{stock_level_id}/movements/manual", response_model=StockMovementResponse)
+async def create_manual_stock_movement(
+    stock_level_id: UUID,
+    movement_type: MovementType = Query(..., description="Type of movement"),
+    quantity_change: Decimal = Query(..., description="Quantity change (+/-)"),
+    reason: str = Query(..., description="Reason for movement"),
+    notes: Optional[str] = Query(default=None, description="Additional notes"),
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Create a manual stock movement."""
+    try:
+        return await service.create_manual_stock_movement(
+            stock_level_id=stock_level_id,
+            movement_type=movement_type,
+            quantity_change=quantity_change,
+            reason=reason,
+            notes=notes
+        )
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
+@router.post("/stock/{stock_level_id}/rent-out", response_model=StockMovementResponse)
+async def rent_out_stock(
+    stock_level_id: UUID,
+    quantity: Decimal = Query(..., ge=0, description="Quantity to rent out"),
+    transaction_id: str = Query(..., description="Transaction ID"),
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Move stock from available to on rent."""
+    try:
+        return await service.rent_out_stock(
+            stock_level_id=stock_level_id,
+            quantity=quantity,
+            transaction_id=transaction_id
+        )
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
+@router.post("/stock/{stock_level_id}/return-from-rent", response_model=StockMovementResponse)
+async def return_from_rent(
+    stock_level_id: UUID,
+    quantity: Decimal = Query(..., ge=0, description="Quantity to return"),
+    transaction_id: str = Query(..., description="Transaction ID"),
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Move stock from on rent back to available."""
+    try:
+        return await service.return_from_rent(
+            stock_level_id=stock_level_id,
+            quantity=quantity,
+            transaction_id=transaction_id
+        )
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))

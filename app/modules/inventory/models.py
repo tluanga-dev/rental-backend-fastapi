@@ -40,6 +40,31 @@ class InventoryUnitCondition(str, Enum):
     DAMAGED = "DAMAGED"
 
 
+class MovementType(str, Enum):
+    """Stock movement type enumeration."""
+    PURCHASE = "PURCHASE"
+    SALE = "SALE"
+    RENTAL_OUT = "RENTAL_OUT"
+    RENTAL_RETURN = "RENTAL_RETURN"
+    ADJUSTMENT_POSITIVE = "ADJUSTMENT_POSITIVE"
+    ADJUSTMENT_NEGATIVE = "ADJUSTMENT_NEGATIVE"
+    DAMAGE_LOSS = "DAMAGE_LOSS"
+    TRANSFER_IN = "TRANSFER_IN"
+    TRANSFER_OUT = "TRANSFER_OUT"
+    SYSTEM_CORRECTION = "SYSTEM_CORRECTION"
+    INITIAL_STOCK = "INITIAL_STOCK"
+
+
+class ReferenceType(str, Enum):
+    """Stock movement reference type enumeration."""
+    TRANSACTION = "TRANSACTION"
+    MANUAL_ADJUSTMENT = "MANUAL_ADJUSTMENT"
+    SYSTEM_CORRECTION = "SYSTEM_CORRECTION"
+    BULK_IMPORT = "BULK_IMPORT"
+    MAINTENANCE = "MAINTENANCE"
+    INVENTORY_COUNT = "INVENTORY_COUNT"
+
+
 
 class InventoryUnit(BaseModel):
     """
@@ -260,37 +285,32 @@ class StockLevel(BaseModel):
     """
     Stock level model for tracking item quantities at locations.
     
+    This model tracks the current stock levels for items at specific locations,
+    including available quantities and quantities currently on rent.
+    
     Attributes:
         item_id: Item ID
         location_id: Location ID
-        quantity_on_hand: Current quantity on hand
-        quantity_available: Available quantity
-        quantity_reserved: Reserved quantity
-        quantity_on_order: Quantity on order
-        minimum_level: M
-        
-        u8o.linimum stock level
-        maximum_level: Maximum stock level
-        reorder_point: Reorder point
+        quantity_on_hand: Total quantity currently in stock
+        quantity_available: Quantity available for rent/sale
+        quantity_on_rent: Quantity currently rented out
         item: Item relationship
         location: Location relationship
+        stock_movements: All stock movements for this stock level
     """
     
     __tablename__ = "stock_levels"
     
     item_id = Column(UUIDType(), ForeignKey("items.id"), nullable=False, comment="Item ID")
     location_id = Column(UUIDType(), ForeignKey("locations.id"), nullable=False, comment="Location ID")
-    quantity_on_hand = Column(String(10), nullable=False, default="0", comment="Current quantity on hand")
-    quantity_available = Column(String(10), nullable=False, default="0", comment="Available quantity")
-    quantity_reserved = Column(String(10), nullable=False, default="0", comment="Reserved quantity")
-    quantity_on_order = Column(String(10), nullable=False, default="0", comment="Quantity on order")
-    minimum_level = Column(String(10), nullable=False, default="0", comment="Minimum stock level")
-    maximum_level = Column(String(10), nullable=False, default="0", comment="Maximum stock level")
-    reorder_point = Column(String(10), nullable=False, default="0", comment="Reorder point")
+    quantity_on_hand = Column(Numeric(10, 2), nullable=False, default=0, comment="Current quantity on hand")
+    quantity_available = Column(Numeric(10, 2), nullable=False, default=0, comment="Available quantity")
+    quantity_on_rent = Column(Numeric(10, 2), nullable=False, default=0, comment="Quantity currently on rent")
     
     # Relationships
     item = relationship("Item", back_populates="stock_levels", lazy="select")
     # location = relationship("Location", back_populates="stock_levels", lazy="select")  # Temporarily disabled
+    stock_movements = relationship("StockMovement", back_populates="stock_level", lazy="select", cascade="all, delete-orphan")
     
     # Indexes for efficient queries
     __table_args__ = (
@@ -304,7 +324,7 @@ class StockLevel(BaseModel):
         self,
         item_id: str,
         location_id: str,
-        quantity_on_hand: str = "0",
+        quantity_on_hand: Decimal = Decimal("0"),
         **kwargs
     ):
         """
@@ -321,98 +341,81 @@ class StockLevel(BaseModel):
         self.location_id = location_id
         self.quantity_on_hand = quantity_on_hand
         self.quantity_available = quantity_on_hand
-        self.quantity_reserved = "0"
-        self.quantity_on_order = "0"
-        self.minimum_level = "0"
-        self.maximum_level = "0"
-        self.reorder_point = "0"
+        self.quantity_on_rent = Decimal("0")
         self._validate()
     
     def _validate(self):
         """Validate stock level business rules."""
-        # Validate all quantities are valid numbers
-        try:
-            int(self.quantity_on_hand)
-            int(self.quantity_available)
-            int(self.quantity_reserved)
-            int(self.quantity_on_order)
-            int(self.minimum_level)
-            int(self.maximum_level)
-            int(self.reorder_point)
-        except ValueError:
-            raise ValueError("All quantity fields must be valid numbers")
-        
         # Validate non-negative quantities
-        if int(self.quantity_on_hand) < 0:
+        if self.quantity_on_hand < 0:
             raise ValueError("Quantity on hand cannot be negative")
         
-        if int(self.quantity_available) < 0:
+        if self.quantity_available < 0:
             raise ValueError("Available quantity cannot be negative")
         
-        if int(self.quantity_reserved) < 0:
-            raise ValueError("Reserved quantity cannot be negative")
+        if self.quantity_on_rent < 0:
+            raise ValueError("Quantity on rent cannot be negative")
         
-        if int(self.quantity_on_order) < 0:
-            raise ValueError("Quantity on order cannot be negative")
-        
-        if int(self.minimum_level) < 0:
-            raise ValueError("Minimum level cannot be negative")
-        
-        if int(self.maximum_level) < 0:
-            raise ValueError("Maximum level cannot be negative")
-        
-        if int(self.reorder_point) < 0:
-            raise ValueError("Reorder point cannot be negative")
+        # Validate quantity logic
+        total_allocated = self.quantity_available + self.quantity_on_rent
+        if total_allocated > self.quantity_on_hand:
+            raise ValueError("Total allocated quantities cannot exceed quantity on hand")
     
-    def is_below_minimum(self) -> bool:
-        """Check if stock is below minimum level."""
-        return int(self.quantity_on_hand) < int(self.minimum_level)
-    
-    def is_above_maximum(self) -> bool:
-        """Check if stock is above maximum level."""
-        return int(self.quantity_on_hand) > int(self.maximum_level)
-    
-    def needs_reorder(self) -> bool:
-        """Check if stock needs reordering."""
-        return int(self.quantity_on_hand) <= int(self.reorder_point)
-    
-    def adjust_quantity(self, adjustment: int, updated_by: Optional[str] = None):
+    def adjust_quantity(self, adjustment: Decimal, updated_by: Optional[str] = None):
         """Adjust quantity on hand."""
-        current_quantity = int(self.quantity_on_hand)
-        new_quantity = current_quantity + adjustment
+        new_quantity = self.quantity_on_hand + adjustment
         
         if new_quantity < 0:
             raise ValueError("Quantity adjustment would result in negative stock")
         
-        self.quantity_on_hand = str(new_quantity)
-        self.quantity_available = str(max(0, new_quantity - int(self.quantity_reserved)))
+        # Maintain proportional allocation if reducing stock
+        if adjustment < 0 and self.quantity_on_hand > 0:
+            ratio = new_quantity / self.quantity_on_hand
+            self.quantity_available = self.quantity_available * ratio
+            self.quantity_on_rent = self.quantity_on_rent * ratio
+        
+        self.quantity_on_hand = new_quantity
+        
+        # Ensure available quantity doesn't exceed total
+        if self.quantity_available > new_quantity:
+            self.quantity_available = new_quantity
+        
         self.updated_by = updated_by
+        self._validate()
     
-    def reserve_quantity(self, quantity: int, updated_by: Optional[str] = None):
-        """Reserve quantity."""
+    def rent_out_quantity(self, quantity: Decimal, updated_by: Optional[str] = None):
+        """Move quantity from available to on rent."""
         if quantity < 0:
-            raise ValueError("Cannot reserve negative quantity")
+            raise ValueError("Cannot rent negative quantity")
         
-        available_quantity = int(self.quantity_available)
-        if quantity > available_quantity:
-            raise ValueError("Cannot reserve more than available quantity")
+        if quantity > self.quantity_available:
+            raise ValueError("Cannot rent more than available quantity")
         
-        self.quantity_reserved = str(int(self.quantity_reserved) + quantity)
-        self.quantity_available = str(int(self.quantity_available) - quantity)
+        self.quantity_available -= quantity
+        self.quantity_on_rent += quantity
         self.updated_by = updated_by
+        self._validate()
     
-    def release_reservation(self, quantity: int, updated_by: Optional[str] = None):
-        """Release reserved quantity."""
+    def return_from_rent(self, quantity: Decimal, updated_by: Optional[str] = None):
+        """Move quantity from on rent back to available."""
         if quantity < 0:
-            raise ValueError("Cannot release negative quantity")
+            raise ValueError("Cannot return negative quantity")
         
-        reserved_quantity = int(self.quantity_reserved)
-        if quantity > reserved_quantity:
-            raise ValueError("Cannot release more than reserved quantity")
+        if quantity > self.quantity_on_rent:
+            raise ValueError("Cannot return more than rented quantity")
         
-        self.quantity_reserved = str(reserved_quantity - quantity)
-        self.quantity_available = str(int(self.quantity_available) + quantity)
+        self.quantity_on_rent -= quantity
+        self.quantity_available += quantity
         self.updated_by = updated_by
+        self._validate()
+    
+    def is_available_for_rent(self, quantity: Decimal = Decimal("1")) -> bool:
+        """Check if specified quantity is available for rent."""
+        return self.quantity_available >= quantity and self.is_active
+    
+    def has_rented_quantity(self, quantity: Decimal = Decimal("1")) -> bool:
+        """Check if specified quantity is currently on rent."""
+        return self.quantity_on_rent >= quantity
     
     @property
     def display_name(self) -> str:
@@ -430,7 +433,8 @@ class StockLevel(BaseModel):
         return (
             f"StockLevel(id={self.id}, item_id={self.item_id}, "
             f"location_id={self.location_id}, on_hand={self.quantity_on_hand}, "
-            f"available={self.quantity_available}, active={self.is_active})"
+            f"available={self.quantity_available}, on_rent={self.quantity_on_rent}, "
+            f"active={self.is_active})"
         )
 
 
@@ -525,4 +529,186 @@ class SKUSequence(BaseModel):
         return (
             f"SKUSequence(id={self.id}, brand_code='{self.brand_code}', "
             f"category_code='{self.category_code}', next_sequence='{self.next_sequence}')"
+        )
+
+
+class StockMovement(BaseModel):
+    """
+    Stock movement model for tracking all stock changes with audit trail.
+    
+    This model records every change to stock levels, including the type of movement,
+    quantities before and after, and references to the triggering transactions.
+    
+    Attributes:
+        stock_level_id: Reference to the stock level being modified
+        item_id: Item ID for efficient querying
+        location_id: Location ID for efficient querying
+        movement_type: Type of movement (PURCHASE, SALE, RENTAL_OUT, etc.)
+        reference_type: Type of reference (TRANSACTION, MANUAL_ADJUSTMENT, etc.)
+        reference_id: External reference ID (transaction ID, etc.)
+        quantity_change: Quantity change (positive for additions, negative for reductions)
+        quantity_before: Quantity before the movement
+        quantity_after: Quantity after the movement
+        reason: Human-readable reason for the movement
+        notes: Additional notes
+        transaction_line_id: Optional link to specific transaction line
+        stock_level: Relationship to stock level
+        item: Relationship to item
+    """
+    
+    __tablename__ = "stock_movements"
+    
+    # Core references
+    stock_level_id = Column(UUIDType(), ForeignKey("stock_levels.id"), nullable=False, comment="Stock level ID")
+    item_id = Column(UUIDType(), ForeignKey("items.id"), nullable=False, comment="Item ID")
+    location_id = Column(UUIDType(), ForeignKey("locations.id"), nullable=False, comment="Location ID")
+    
+    # Movement classification
+    movement_type = Column(String(50), nullable=False, comment="Type of movement")
+    reference_type = Column(String(50), nullable=False, comment="Type of reference")
+    reference_id = Column(String(100), nullable=True, comment="External reference ID")
+    
+    # Quantity tracking
+    quantity_change = Column(Numeric(10, 2), nullable=False, comment="Quantity change (+/-)")
+    quantity_before = Column(Numeric(10, 2), nullable=False, comment="Quantity before movement")
+    quantity_after = Column(Numeric(10, 2), nullable=False, comment="Quantity after movement")
+    
+    # Context and audit
+    reason = Column(String(500), nullable=False, comment="Reason for movement")
+    notes = Column(Text, nullable=True, comment="Additional notes")
+    transaction_line_id = Column(UUIDType(), nullable=True, comment="Transaction line reference")
+    
+    # Relationships
+    stock_level = relationship("StockLevel", back_populates="stock_movements", lazy="select")
+    item = relationship("Item", back_populates="stock_movements", lazy="select")
+    
+    # Indexes for efficient queries
+    __table_args__ = (
+        Index('idx_stock_movement_stock_level', 'stock_level_id'),
+        Index('idx_stock_movement_item', 'item_id'),
+        Index('idx_stock_movement_location', 'location_id'),
+        Index('idx_stock_movement_type', 'movement_type'),
+        Index('idx_stock_movement_reference', 'reference_type', 'reference_id'),
+        Index('idx_stock_movement_created', 'created_at'),
+        Index('idx_stock_movement_item_created', 'item_id', 'created_at'),
+        Index('idx_stock_movement_stock_created', 'stock_level_id', 'created_at'),
+    )
+    
+    def __init__(
+        self,
+        stock_level_id: str,
+        item_id: str,
+        location_id: str,
+        movement_type: MovementType,
+        reference_type: ReferenceType,
+        quantity_change: Decimal,
+        quantity_before: Decimal,
+        quantity_after: Decimal,
+        reason: str,
+        reference_id: Optional[str] = None,
+        notes: Optional[str] = None,
+        transaction_line_id: Optional[str] = None,
+        **kwargs
+    ):
+        """
+        Initialize a Stock Movement.
+        
+        Args:
+            stock_level_id: Stock level ID
+            item_id: Item ID
+            location_id: Location ID
+            movement_type: Type of movement
+            reference_type: Type of reference
+            quantity_change: Quantity change (+/-)
+            quantity_before: Quantity before movement
+            quantity_after: Quantity after movement
+            reason: Reason for movement
+            reference_id: External reference ID
+            notes: Additional notes
+            transaction_line_id: Transaction line reference
+            **kwargs: Additional BaseModel fields
+        """
+        super().__init__(**kwargs)
+        self.stock_level_id = stock_level_id
+        self.item_id = item_id
+        self.location_id = location_id
+        self.movement_type = movement_type.value if isinstance(movement_type, MovementType) else movement_type
+        self.reference_type = reference_type.value if isinstance(reference_type, ReferenceType) else reference_type
+        self.quantity_change = quantity_change
+        self.quantity_before = quantity_before
+        self.quantity_after = quantity_after
+        self.reason = reason
+        self.reference_id = reference_id
+        self.notes = notes
+        self.transaction_line_id = transaction_line_id
+        self._validate()
+    
+    def _validate(self):
+        """Validate stock movement business rules."""
+        # Movement type validation
+        if self.movement_type not in [mt.value for mt in MovementType]:
+            raise ValueError(f"Invalid movement type: {self.movement_type}")
+        
+        # Reference type validation
+        if self.reference_type not in [rt.value for rt in ReferenceType]:
+            raise ValueError(f"Invalid reference type: {self.reference_type}")
+        
+        # Quantity validation
+        if self.quantity_before < 0:
+            raise ValueError("Quantity before cannot be negative")
+        
+        if self.quantity_after < 0:
+            raise ValueError("Quantity after cannot be negative")
+        
+        # Validate quantity math
+        calculated_after = self.quantity_before + self.quantity_change
+        if abs(calculated_after - self.quantity_after) > Decimal('0.01'):
+            raise ValueError("Quantity math doesn't add up: before + change != after")
+        
+        # Reason validation
+        if not self.reason or not self.reason.strip():
+            raise ValueError("Reason cannot be empty")
+        
+        if len(self.reason) > 500:
+            raise ValueError("Reason cannot exceed 500 characters")
+        
+        # Reference ID validation
+        if self.reference_id and len(self.reference_id) > 100:
+            raise ValueError("Reference ID cannot exceed 100 characters")
+    
+    def is_increase(self) -> bool:
+        """Check if this movement increases stock."""
+        return self.quantity_change > 0
+    
+    def is_decrease(self) -> bool:
+        """Check if this movement decreases stock."""
+        return self.quantity_change < 0
+    
+    def is_neutral(self) -> bool:
+        """Check if this movement is neutral (no change)."""
+        return self.quantity_change == 0
+    
+    @property
+    def display_name(self) -> str:
+        """Get movement display name."""
+        direction = "+" if self.quantity_change >= 0 else ""
+        return f"{self.movement_type}: {direction}{self.quantity_change}"
+    
+    @property
+    def full_display_name(self) -> str:
+        """Get full movement display name with item info."""
+        if self.item:
+            return f"{self.item.item_name} - {self.display_name}"
+        return self.display_name
+    
+    def __str__(self) -> str:
+        """String representation of stock movement."""
+        return self.full_display_name
+    
+    def __repr__(self) -> str:
+        """Developer representation of stock movement."""
+        return (
+            f"StockMovement(id={self.id}, type='{self.movement_type}', "
+            f"change={self.quantity_change}, before={self.quantity_before}, "
+            f"after={self.quantity_after}, active={self.is_active})"
         )

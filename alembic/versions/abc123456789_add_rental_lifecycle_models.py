@@ -7,7 +7,6 @@ Create Date: 2025-07-14 12:00:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'abc123456789'
@@ -26,11 +25,11 @@ def upgrade() -> None:
     
     # Create rental_lifecycles table
     op.create_table('rental_lifecycles',
-        sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('gen_random_uuid()'), nullable=False),
-        sa.Column('transaction_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('id', sa.CHAR(36), nullable=False),
+        sa.Column('transaction_id', sa.CHAR(36), nullable=False),
         sa.Column('current_status', sa.String(length=30), nullable=False, comment='Current rental status'),
         sa.Column('last_status_change', sa.TIMESTAMP(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP'), comment='Last status change timestamp'),
-        sa.Column('status_changed_by', postgresql.UUID(as_uuid=True), nullable=True, comment='User who changed status'),
+        sa.Column('status_changed_by', sa.CHAR(36), nullable=True, comment='User who changed status'),
         sa.Column('total_returned_quantity', sa.Numeric(precision=10, scale=2), nullable=False, server_default='0', comment='Total quantity returned across all events'),
         sa.Column('expected_return_date', sa.Date(), nullable=True, comment='Expected return date (may change with extensions)'),
         sa.Column('total_late_fees', sa.Numeric(precision=15, scale=2), nullable=False, server_default='0', comment='Accumulated late fees'),
@@ -52,13 +51,13 @@ def upgrade() -> None:
     
     # Create rental_return_events table
     op.create_table('rental_return_events',
-        sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('gen_random_uuid()'), nullable=False),
-        sa.Column('rental_lifecycle_id', postgresql.UUID(as_uuid=True), nullable=False, comment='Associated rental lifecycle'),
+        sa.Column('id', sa.CHAR(36), nullable=False),
+        sa.Column('rental_lifecycle_id', sa.CHAR(36), nullable=False, comment='Associated rental lifecycle'),
         sa.Column('event_type', sa.String(length=20), nullable=False, comment='Type of return event'),
         sa.Column('event_date', sa.Date(), nullable=False, comment='Date of the event'),
-        sa.Column('processed_by', postgresql.UUID(as_uuid=True), nullable=True, comment='User who processed this event'),
+        sa.Column('processed_by', sa.CHAR(36), nullable=True, comment='User who processed this event'),
         sa.Column('processed_at', sa.TIMESTAMP(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP'), comment='When the event was processed'),
-        sa.Column('items_returned', postgresql.JSONB(astext_type=sa.Text()), nullable=True, comment='JSON array of returned items with quantities and conditions'),
+        sa.Column('items_returned', sa.JSON(), nullable=True, comment='JSON array of returned items with quantities and conditions'),
         sa.Column('total_quantity_returned', sa.Numeric(precision=10, scale=2), nullable=False, server_default='0', comment='Total quantity returned in this event'),
         sa.Column('late_fees_charged', sa.Numeric(precision=15, scale=2), nullable=False, server_default='0', comment='Late fees charged in this event'),
         sa.Column('damage_fees_charged', sa.Numeric(precision=15, scale=2), nullable=False, server_default='0', comment='Damage fees charged in this event'),
@@ -84,16 +83,16 @@ def upgrade() -> None:
     
     # Create rental_item_inspections table
     op.create_table('rental_item_inspections',
-        sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('gen_random_uuid()'), nullable=False),
-        sa.Column('return_event_id', postgresql.UUID(as_uuid=True), nullable=False, comment='Associated return event'),
-        sa.Column('transaction_line_id', postgresql.UUID(as_uuid=True), nullable=False, comment='Transaction line being inspected'),
+        sa.Column('id', sa.CHAR(36), nullable=False),
+        sa.Column('return_event_id', sa.CHAR(36), nullable=False, comment='Associated return event'),
+        sa.Column('transaction_line_id', sa.CHAR(36), nullable=False, comment='Transaction line being inspected'),
         sa.Column('quantity_inspected', sa.Numeric(precision=10, scale=2), nullable=False, comment='Quantity of this item inspected'),
         sa.Column('condition', sa.String(length=20), nullable=False, comment='Overall condition assessment'),
-        sa.Column('inspected_by', postgresql.UUID(as_uuid=True), nullable=True, comment='User who performed inspection'),
+        sa.Column('inspected_by', sa.CHAR(36), nullable=True, comment='User who performed inspection'),
         sa.Column('inspected_at', sa.TIMESTAMP(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP'), comment='Inspection timestamp'),
         sa.Column('has_damage', sa.Boolean(), nullable=False, server_default='false', comment='Whether item has damage'),
         sa.Column('damage_description', sa.Text(), nullable=True, comment='Description of any damage'),
-        sa.Column('damage_photos', postgresql.JSONB(astext_type=sa.Text()), nullable=True, comment='JSON array of damage photo URLs'),
+        sa.Column('damage_photos', sa.JSON(), nullable=True, comment='JSON array of damage photo URLs'),
         sa.Column('damage_fee_assessed', sa.Numeric(precision=15, scale=2), nullable=False, server_default='0', comment='Damage fee assessed for this item'),
         sa.Column('cleaning_fee_assessed', sa.Numeric(precision=15, scale=2), nullable=False, server_default='0', comment='Cleaning fee assessed for this item'),
         sa.Column('replacement_required', sa.Boolean(), nullable=False, server_default='false', comment='Whether item needs replacement'),

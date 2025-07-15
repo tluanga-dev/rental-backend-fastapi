@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from app.modules.master_data.brands.models import Brand
     from app.modules.master_data.categories.models import Category
     from app.modules.master_data.units.models import UnitOfMeasurement
-    from app.modules.inventory.models import InventoryUnit, StockLevel
+    from app.modules.inventory.models import InventoryUnit, StockLevel, StockMovement
     from app.modules.transactions.models import TransactionLine
 
 
@@ -85,6 +85,7 @@ class Item(BaseModel):
     unit_of_measurement = relationship("UnitOfMeasurement", back_populates="items", lazy="select")
     inventory_units = relationship("InventoryUnit", back_populates="item", lazy="select")
     stock_levels = relationship("StockLevel", back_populates="item", lazy="select")
+    stock_movements = relationship("StockMovement", back_populates="item", lazy="select")
     # transaction_lines = relationship("TransactionLine", back_populates="item", lazy="select")  # Temporarily disabled
     
     # Indexes for efficient queries

@@ -68,7 +68,7 @@ class RentalLifecycle(BaseModel):
     notes = Column(Text, nullable=True, comment="General notes about the rental")
     
     # Relationships
-    transaction = relationship("TransactionHeader", backref="rental_lifecycle", lazy="select")
+    transaction = relationship("TransactionHeader", back_populates="rental_lifecycle", lazy="select")
     return_events = relationship("RentalReturnEvent", back_populates="rental_lifecycle", lazy="select", cascade="all, delete-orphan")
     
     # Indexes
