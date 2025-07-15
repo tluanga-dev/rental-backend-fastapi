@@ -34,7 +34,7 @@ from app.modules.master_data.routes import router as master_data_router
 from app.modules.suppliers.routes import router as suppliers_router
 from app.modules.customers.routes import router as customers_router
 from app.modules.inventory.routes import router as inventory_router
-from app.modules.transactions.routes import router as transactions_router, returns_router
+from app.modules.transactions.routes import router as transactions_router, returns_router, rentals_router as transaction_rentals_router
 from app.modules.rentals.routes import router as rentals_router
 from app.modules.analytics.routes import router as analytics_router
 from app.modules.system.routes import router as system_router
@@ -144,6 +144,7 @@ app.include_router(customers_router, prefix="/api/customers", tags=["Customers"]
 app.include_router(inventory_router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions"])
 app.include_router(returns_router, prefix="/api/transactions", tags=["Returns"])
+app.include_router(transaction_rentals_router, prefix="/api/transactions", tags=["Rental Management"])
 app.include_router(rentals_router, prefix="/api/rentals", tags=["Rentals"])
 app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(system_router, prefix="/api/system", tags=["System"])

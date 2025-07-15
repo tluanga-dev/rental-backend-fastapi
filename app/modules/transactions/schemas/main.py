@@ -10,6 +10,7 @@ from app.modules.transactions.models import (
     PaymentMethod,
     PaymentStatus,
     RentalPeriodUnit,
+    RentalStatus,
     LineItemType,
 )
 
@@ -99,6 +100,8 @@ class TransactionHeaderResponse(BaseModel):
     reference_transaction_id: Optional[UUID]
     rental_start_date: Optional[date]
     rental_end_date: Optional[date]
+    current_rental_status: Optional[str]
+    customer_advance_balance: Decimal
     actual_return_date: Optional[date]
     notes: Optional[str]
     payment_method: Optional[PaymentMethod]
@@ -439,6 +442,8 @@ class TransactionWithLinesResponse(BaseModel):
     reference_transaction_id: Optional[UUID]
     rental_start_date: Optional[date]
     rental_end_date: Optional[date]
+    current_rental_status: Optional[str]
+    customer_advance_balance: Decimal
     actual_return_date: Optional[date]
     notes: Optional[str]
     payment_method: Optional[PaymentMethod]
@@ -492,6 +497,8 @@ class TransactionHeaderWithLinesListResponse(BaseModel):
     reference_transaction_id: Optional[UUID]
     rental_start_date: Optional[date]
     rental_end_date: Optional[date]
+    current_rental_status: Optional[str]
+    customer_advance_balance: Decimal
     actual_return_date: Optional[date]
     notes: Optional[str]
     payment_method: Optional[PaymentMethod]
