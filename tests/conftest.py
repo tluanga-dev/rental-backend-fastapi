@@ -13,7 +13,11 @@ from app.core.security import get_password_hash, create_token_pair
 
 
 # Test database URL
-TEST_DATABASE_URL = "postgresql+asyncpg://fastapi_user:fastapi_password@localhost:5432/fastapi_test_db"
+import os
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL", 
+    "postgresql+asyncpg://fastapi_user:fastapi_password@db:5432/fastapi_test_db"
+)
 
 # Create test engine
 test_engine = create_async_engine(

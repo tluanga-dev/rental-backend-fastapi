@@ -47,6 +47,9 @@ from app.modules.transactions.schemas import (
     RentalItemCreate,
     NewRentalRequest,
     NewRentalResponse,
+    SaleItemCreate,
+    NewSaleRequest,
+    NewSaleResponse,
 )
 from app.modules.customers.repository import CustomerRepository
 from app.modules.inventory.repository import ItemRepository, InventoryUnitRepository
@@ -1041,6 +1044,149 @@ class TransactionService:
             self.logger.log_session_operation("Transaction rolled back due to error")
             raise e
 
+    async def create_new_sale(self, sale_data: NewSaleRequest) -> NewSaleResponse:
+        """Create a new sale transaction using the new-sale endpoint format."""
+        try:
+            # Validate customer exists
+            customer = await self.customer_repository.get_by_id(sale_data.customer_id)
+            if not customer:
+                raise NotFoundError(f"Customer with ID {sale_data.customer_id} not found")
+
+            # Verify customer can transact
+            if not customer.can_transact():
+                raise ValidationError("Customer cannot transact due to blacklist status")
+
+            # Validate location exists (use first available location if not specified)
+            from app.modules.master_data.locations.repository import LocationRepository
+            location_repo = LocationRepository(self.session)
+            
+            # Get the first available location as a default
+            locations = await location_repo.get_all(active_only=True)
+            if not locations:
+                raise NotFoundError("No active locations found")
+            
+            location = locations[0]  # Use first location as default
+
+            # Validate all items exist and are available for sale
+            from app.modules.master_data.item_master.repository import ItemMasterRepository
+            item_repo = ItemMasterRepository(self.session)
+            validated_items = []
+            
+            for item in sale_data.items:
+                item_exists = await item_repo.get_by_id(item.item_id)
+                if not item_exists:
+                    raise NotFoundError(f"Item with ID {item.item_id} not found")
+                if not item_exists.is_saleable:
+                    raise ValidationError(f"Item {item.item_id} is not available for sale")
+                validated_items.append(item_exists)
+
+            # Check inventory availability
+            for item in sale_data.items:
+                existing_stock = await self.inventory_service.stock_level_repository.get_by_item_location(
+                    item.item_id, location.id
+                )
+                if not existing_stock:
+                    raise ValidationError(f"No stock found for item {item.item_id}")
+                
+                if existing_stock.quantity_available < Decimal(str(item.quantity)):
+                    raise ValidationError(f"Insufficient stock for item {item.item_id}. Available: {existing_stock.quantity_available}, Requested: {item.quantity}")
+
+            # Generate unique transaction number
+            import random
+            transaction_number = (
+                f"SAL-{sale_data.transaction_date.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+            )
+
+            # Ensure uniqueness
+            while await self.transaction_repository.get_by_number(transaction_number):
+                transaction_number = f"SAL-{sale_data.transaction_date.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+
+            # Create transaction header
+            transaction = TransactionHeader(
+                transaction_number=transaction_number,
+                transaction_type=TransactionType.SALE,
+                transaction_date=datetime.combine(sale_data.transaction_date, datetime.min.time()),
+                customer_id=str(sale_data.customer_id),
+                location_id=str(location.id),
+                status=TransactionStatus.COMPLETED,
+                notes=sale_data.notes or "",
+                subtotal=Decimal("0"),
+                discount_amount=Decimal("0"),
+                tax_amount=Decimal("0"),
+                total_amount=Decimal("0"),
+                paid_amount=Decimal("0"),
+                deposit_amount=Decimal("0"),
+                payment_status=PaymentStatus.PAID,
+            )
+
+            # Add transaction to session
+            self.session.add(transaction)
+            await self.session.flush()  # Get the ID without committing
+
+            # Create transaction lines
+            total_amount = Decimal("0")
+            tax_total = Decimal("0")
+            discount_total = Decimal("0")
+
+            for idx, item in enumerate(sale_data.items):
+                # Calculate line values
+                line_subtotal = item.unit_cost * Decimal(str(item.quantity))
+                tax_amount = (line_subtotal * (item.tax_rate or Decimal("0"))) / 100
+                discount_amount = item.discount_amount or Decimal("0")
+                line_total = line_subtotal + tax_amount - discount_amount
+
+                # Create transaction line
+                line = TransactionLine(
+                    transaction_id=str(transaction.id),
+                    line_number=idx + 1,
+                    line_type=LineItemType.PRODUCT,
+                    item_id=str(item.item_id),
+                    description=f"Sale: {validated_items[idx].item_name if idx < len(validated_items) else 'Unknown Item'}",
+                    quantity=Decimal(str(item.quantity)),
+                    unit_price=item.unit_cost,
+                    tax_rate=item.tax_rate or Decimal("0"),
+                    tax_amount=tax_amount,
+                    discount_amount=discount_amount,
+                    line_total=line_total,
+                    notes=item.notes or "",
+                )
+
+                self.session.add(line)
+                total_amount += line_total
+                tax_total += tax_amount
+                discount_total += discount_amount
+
+            # Update transaction totals
+            transaction.subtotal = total_amount - tax_total + discount_total
+            transaction.tax_amount = tax_total
+            transaction.discount_amount = discount_total
+            transaction.total_amount = total_amount
+            transaction.paid_amount = total_amount  # Sale is paid in full
+
+            # Update inventory for sold items
+            await self._update_inventory_for_sale(sale_data, transaction, location)
+
+            # Commit transaction
+            await self.session.commit()
+            await self.session.refresh(transaction)
+
+            # Get the complete transaction with lines for response
+            result = await self.get_transaction_with_lines(transaction.id)
+
+            response = NewSaleResponse(
+                success=True,
+                message="Sale transaction created successfully",
+                data=result.model_dump(),
+                transaction_id=transaction.id,
+                transaction_number=transaction.transaction_number,
+            )
+            
+            return response
+
+        except Exception as e:
+            await self.session.rollback()
+            raise e
+
     async def create_new_rental(self, rental_data: NewRentalRequest) -> NewRentalResponse:
         """Create a new rental transaction using the new-rental endpoint format."""
         try:
@@ -1289,3 +1435,57 @@ class TransactionService:
                 )
                 
                 self.logger.log_session_operation(f"Stock level created with movement tracking for item {item.item_id}")
+
+    async def _update_inventory_for_sale(self, sale_data: NewSaleRequest, transaction: TransactionHeader, location):
+        """Update inventory for sold items within the same database transaction."""
+        from app.modules.inventory.models import MovementType, ReferenceType
+        from decimal import Decimal
+        
+        for item in sale_data.items:
+            # Check if stock level exists for this item/location
+            existing_stock = await self.inventory_service.stock_level_repository.get_by_item_location(
+                item.item_id, location.id
+            )
+            
+            if not existing_stock:
+                raise ValidationError(f"No stock found for item {item.item_id} at location {location.id}")
+            
+            # Validate sufficient stock
+            if existing_stock.quantity_available < Decimal(str(item.quantity)):
+                raise ValidationError(f"Insufficient stock for item {item.item_id}. Available: {existing_stock.quantity_available}, Requested: {item.quantity}")
+            
+            # Reduce stock levels
+            quantity_change = -Decimal(str(item.quantity))
+            await self.inventory_service.adjust_stock_level(
+                item_id=item.item_id,
+                location_id=location.id,
+                quantity_change=quantity_change,
+                transaction_type="SALE",
+                reference_id=str(transaction.id),
+                notes=f"Sale transaction - Item sold"
+            )
+            
+            # Mark inventory units as sold (for tracked items)
+            await self._mark_inventory_units_as_sold(item.item_id, location.id, item.quantity, transaction.id)
+
+    async def _mark_inventory_units_as_sold(self, item_id: UUID, location_id: UUID, quantity: int, transaction_id: UUID):
+        """Mark specific inventory units as sold."""
+        from app.modules.inventory.models import InventoryUnitStatus
+        
+        # Get available inventory units for this item at this location
+        available_units = await self.inventory_unit_repository.get_available_units(
+            item_id=item_id,
+            location_id=location_id,
+            limit=quantity
+        )
+        
+        if len(available_units) < quantity:
+            # If we don't have enough individual units, just log this
+            # This might happen for bulk items where we track stock levels but not individual units
+            return
+        
+        # Mark the required number of units as sold
+        for i in range(min(quantity, len(available_units))):
+            unit = available_units[i]
+            unit.mark_as_sold(updated_by=f"Transaction {transaction_id}")
+            await self.session.flush()  # Flush to ensure changes are applied

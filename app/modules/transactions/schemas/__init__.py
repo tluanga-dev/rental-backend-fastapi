@@ -18,6 +18,15 @@ __all__ = [
     "TransactionWithLinesResponse",
     "TransactionSummaryResponse",
     
+    # Purchase and rental schemas
+    "NewPurchaseRequest",
+    "NewPurchaseResponse",
+    "NewRentalRequest", 
+    "NewRentalResponse",
+    "NewSaleRequest",
+    "NewSaleResponse",
+    "SaleItemCreate",
+    
     # From returns schemas  
     "SaleReturnCreate",
     "PurchaseReturnCreate",

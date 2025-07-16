@@ -39,6 +39,8 @@ from app.modules.transactions.schemas import (
     NewPurchaseResponse,
     NewRentalRequest,
     NewRentalResponse,
+    NewSaleRequest,
+    NewSaleResponse,
 )
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 
@@ -154,6 +156,54 @@ async def create_new_rental(
     """
     try:
         return await service.create_new_rental(rental_data)
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except ConflictError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}",
+        )
+
+
+@router.post(
+    "/new-sale", response_model=NewSaleResponse, status_code=status.HTTP_201_CREATED
+)
+async def create_new_sale(
+    sale_data: NewSaleRequest,
+    service: TransactionService = Depends(get_transaction_service),
+):
+    """
+    Create a new sale transaction with the simplified format.
+
+    This endpoint accepts sale data in the exact format sent by the frontend:
+    - customer_id as string UUID (must exist and be able to transact)
+    - transaction_date as string in YYYY-MM-DD format
+    - notes as string (optional)
+    - reference_number as string (optional, max 50 chars)
+    - items array with:
+      * item_id as string UUID (must exist and be saleable)
+      * quantity as integer (>=1, required)
+      * unit_cost as decimal (>=0, price per unit)
+      * tax_rate as decimal (0-100, optional, defaults to 0)
+      * discount_amount as decimal (>=0, optional, defaults to 0)
+      * notes as string (optional)
+
+    Features:
+    - Automatically validates customer can transact
+    - Generates unique transaction numbers (SAL-YYYYMMDD-XXXX)
+    - Updates inventory stock levels and marks units as sold
+    - Creates stock movement records for audit trail
+    - Supports item-level discounts and taxes
+    - Comprehensive validation at header and line levels
+
+    Returns a standardized response with success status, message, transaction data, and identifiers.
+    """
+    try:
+        return await service.create_new_sale(sale_data)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValidationError as e:
