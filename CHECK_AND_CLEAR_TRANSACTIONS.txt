@@ -1,0 +1,41 @@
+To check what transaction data exists in your database:
+
+1. Run verification query:
+docker-compose exec db psql -U postgres -d fastapi_db < verify_transactions.sql
+
+OR manually:
+docker-compose exec db psql -U postgres -d fastapi_db -c "SELECT 'transaction_headers' as table, COUNT(*) as count, COUNT(CASE WHEN transaction_type = 'PURCHASE' THEN 1 END) as purchases FROM transaction_headers;"
+
+If data still exists, it means the previous delete didn't work. Try these steps:
+
+2. Force clear with CASCADE (more aggressive):
+docker-compose exec db psql -U postgres -d fastapi_db -c "TRUNCATE TABLE transaction_headers CASCADE;"
+
+OR the safer approach:
+
+3. Clear in correct dependency order:
+docker-compose exec db psql -U postgres -d fastapi_db -c "
+BEGIN;
+-- First clear all dependent tables
+DELETE FROM inspection_reports;
+DELETE FROM rental_return_lines;
+DELETE FROM rental_returns;
+DELETE FROM rental_return_events;
+DELETE FROM rental_lifecycles;
+DELETE FROM transaction_metadata;
+DELETE FROM transaction_lines;
+-- Finally clear the main table
+DELETE FROM transaction_headers;
+COMMIT;
+-- Verify
+SELECT 'Remaining transactions:', COUNT(*) FROM transaction_headers;
+"
+
+4. If using Docker, you might need to restart the application to clear any caches:
+docker-compose restart app
+
+5. Alternative - Direct verification through API:
+curl -X GET "http://localhost:8000/api/transactions?skip=0&limit=1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+This will show if there are any transactions in the system.

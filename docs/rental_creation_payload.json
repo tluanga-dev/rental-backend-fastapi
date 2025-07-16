@@ -1,0 +1,30 @@
+{
+  "transaction_date": "2025-01-16",
+  "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+  "location_id": "550e8400-e29b-41d4-a716-446655440002",
+  "payment_method": "CASH",
+  "payment_reference": "REF-2025-001",
+  "notes": "First rental for this customer",
+  "items": [
+    {
+      "item_id": "550e8400-e29b-41d4-a716-446655440003",
+      "quantity": 2,
+      "rental_period_value": 7,
+      "tax_rate": 10.5,
+      "discount_amount": 25.00,
+      "rental_start_date": "2025-01-16",
+      "rental_end_date": "2025-01-23",
+      "notes": "Handle with care"
+    },
+    {
+      "item_id": "550e8400-e29b-41d4-a716-446655440004",
+      "quantity": 1,
+      "rental_period_value": 14,
+      "tax_rate": 10.5,
+      "discount_amount": 0,
+      "rental_start_date": "2025-01-16",
+      "rental_end_date": "2025-01-30",
+      "notes": ""
+    }
+  ]
+}

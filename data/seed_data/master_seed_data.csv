@@ -1,0 +1,183 @@
+## SUPPLIERS
+# Required: supplier_code, company_name, supplier_type
+# Optional: contact_person, email, phone, mobile, address_line1, address_line2, city, state, postal_code, country, tax_id, payment_terms, credit_limit, supplier_tier, status, quality_rating, delivery_rating, website, account_manager, preferred_payment_method, notes, certifications
+# supplier_type: MANUFACTURER, DISTRIBUTOR, WHOLESALER, RETAILER, INVENTORY, SERVICE, DIRECT
+# payment_terms: IMMEDIATE, NET15, NET30, NET45, NET60, NET90, COD
+# supplier_tier: PREMIUM, STANDARD, BASIC, TRIAL
+# status: ACTIVE, INACTIVE, PENDING, APPROVED, SUSPENDED, BLACKLISTED
+supplier_code,company_name,supplier_type,contact_person,email,phone,mobile,address_line1,address_line2,city,state,postal_code,country,tax_id,payment_terms,credit_limit,supplier_tier,status,quality_rating,delivery_rating,website,account_manager,preferred_payment_method,notes,certifications
+SUP001,Global Electronics Ltd,MANUFACTURER,John Smith,john.smith@globalelectronics.com,+1-555-0100,+1-555-0101,123 Industrial Park,Building A,New York,NY,10001,USA,EIN-12-3456789,NET30,50000,PREMIUM,ACTIVE,4.5,4.8,https://globalelectronics.com,Sarah Johnson,BANK_TRANSFER,Leading electronics manufacturer specialized in audio equipment,ISO 9001:2015 CE Certified
+SUP002,Tech Distribution Partners,DISTRIBUTOR,Emma Davis,emma@techdistribution.com,+1-555-0200,+1-555-0201,456 Commerce Center,Suite 200,Los Angeles,CA,90001,USA,EIN-98-7654321,NET45,75000,PREMIUM,ACTIVE,4.7,4.5,https://techdistribution.com,Michael Brown,BANK_TRANSFER,Major tech distributor with nationwide coverage,ISO 9001:2015
+SUP003,Office Supplies Direct,WHOLESALER,Robert Wilson,robert@officesuppliesdirect.com,+1-555-0300,+1-555-0301,789 Business Plaza,,Chicago,IL,60601,USA,EIN-45-6789012,NET30,25000,STANDARD,ACTIVE,4.2,4.0,https://officesuppliesdirect.com,Jennifer Lee,CHECK,Reliable office supplies wholesaler,
+SUP004,Premium Audio Systems,MANUFACTURER,David Chen,david.chen@premiumaudio.com,+1-555-0400,+1-555-0401,321 Sound Valley,Tech Park,San Francisco,CA,94102,USA,EIN-78-9012345,NET60,100000,PREMIUM,ACTIVE,4.9,4.6,https://premiumaudio.com,Lisa Anderson,BANK_TRANSFER,High-end audio equipment manufacturer,ISO 9001:2015 THX Certified
+SUP005,Local Camera Shop,RETAILER,Maria Garcia,maria@localcamerashop.com,+1-555-0500,+1-555-0501,567 Main Street,,Portland,OR,97201,USA,EIN-23-4567890,COD,10000,BASIC,ACTIVE,4.0,4.3,https://localcamerashop.com,Tom Harris,CASH,Local camera equipment retailer good for urgent needs,
+SUP006,Industrial Equipment Co,MANUFACTURER,James Taylor,james.taylor@industrialequip.com,+1-555-0600,+1-555-0601,890 Factory Road,Industrial Zone,Detroit,MI,48201,USA,EIN-56-7890123,NET45,60000,STANDARD,ACTIVE,4.3,4.4,https://industrialequip.com,Nancy White,BANK_TRANSFER,Heavy-duty equipment manufacturer,ISO 9001:2015 OSHA Compliant
+SUP007,Event Rentals Wholesale,WHOLESALER,Patricia Martinez,patricia@eventrentals.com,+1-555-0700,+1-555-0701,234 Event Plaza,Building B,Miami,FL,33101,USA,EIN-89-0123456,NET30,40000,STANDARD,ACTIVE,4.1,4.2,https://eventrentals.com,Kevin Johnson,CHECK,Specialized in event equipment,
+SUP008,Pro Video Solutions,DISTRIBUTOR,Christopher Lee,chris@provideosolutions.com,+1-555-0800,+1-555-0801,678 Media Center,,Atlanta,GA,30301,USA,EIN-34-5678901,NET30,55000,PREMIUM,ACTIVE,4.6,4.7,https://provideosolutions.com,Amanda Davis,BANK_TRANSFER,Professional video equipment distributor,Authorized dealer for major brands
+SUP009,Budget Tech Supplies,WHOLESALER,Jessica Brown,jessica@budgettech.com,+1-555-0900,+1-555-0901,901 Value Street,,Phoenix,AZ,85001,USA,EIN-67-8901234,NET15,20000,BASIC,ACTIVE,3.8,3.9,https://budgettech.com,Mark Wilson,CASH,Budget-friendly tech supplies,
+SUP010,Studio Lighting Pro,MANUFACTURER,Andrew Miller,andrew@studiolighting.com,+1-555-1000,+1-555-1001,345 Light Industrial Park,,Seattle,WA,98101,USA,EIN-90-1234567,NET45,80000,PREMIUM,ACTIVE,4.8,4.9,https://studiolighting.com,Rachel Green,BANK_TRANSFER,Professional lighting equipment manufacturer,ISO 9001:2015 Energy Star Certified
+
+## CUSTOMERS
+# Required: customer_code, customer_type, (first_name + last_name for INDIVIDUAL) OR (business_name for BUSINESS)
+# Optional: email, phone, mobile, address_line1, address_line2, city, state, country, postal_code, tax_number, payment_terms, customer_tier, credit_limit, status, blacklist_status, credit_rating, notes
+# customer_type: INDIVIDUAL, BUSINESS
+# customer_tier: BRONZE, SILVER, GOLD, PLATINUM
+# status: ACTIVE, INACTIVE, SUSPENDED, PENDING
+# blacklist_status: CLEAR, WARNING, BLACKLISTED
+# credit_rating: EXCELLENT, GOOD, FAIR, POOR, NO_RATING
+customer_code,customer_type,business_name,first_name,last_name,email,phone,mobile,address_line1,address_line2,city,state,country,postal_code,tax_number,payment_terms,customer_tier,credit_limit,status,blacklist_status,credit_rating,notes
+CUST001,INDIVIDUAL,,John,Smith,john.smith@email.com,+1-555-2001,+1-555-2002,123 Elm Street,Apt 4B,New York,NY,USA,10001,,,BRONZE,1000,ACTIVE,CLEAR,GOOD,Regular customer with good payment history
+CUST002,BUSINESS,ABC Events Company,Sarah,Johnson,sarah@abcevents.com,+1-555-2003,+1-555-2004,456 Business Ave,Suite 300,Los Angeles,CA,USA,90001,BUS-123-456789,NET30,GOLD,15000,ACTIVE,CLEAR,EXCELLENT,Large event planning company
+CUST003,INDIVIDUAL,,Maria,Garcia,maria.garcia@email.com,+1-555-2005,+1-555-2006,789 Oak Lane,,Chicago,IL,USA,60601,,,SILVER,2500,ACTIVE,CLEAR,GOOD,Frequent renter for personal events
+CUST004,BUSINESS,Tech Solutions Inc,David,Chen,david@techsolutions.com,+1-555-2007,+1-555-2008,321 Corporate Blvd,Floor 12,San Francisco,CA,USA,94102,TECH-987-654321,NET45,PLATINUM,50000,ACTIVE,CLEAR,EXCELLENT,IT services company regular customer
+CUST005,INDIVIDUAL,,Emma,Davis,emma.davis@email.com,+1-555-2009,+1-555-2010,567 Pine Street,,Portland,OR,USA,97201,,,BRONZE,750,ACTIVE,CLEAR,FAIR,New customer
+CUST006,BUSINESS,Creative Studios LLC,Robert,Wilson,robert@creativestudios.com,+1-555-2011,+1-555-2012,890 Artist Way,Studio 5,Seattle,WA,USA,98101,CREA-456-789012,NET30,GOLD,20000,ACTIVE,CLEAR,GOOD,Video production company
+CUST007,INDIVIDUAL,,Jennifer,Lee,jennifer.lee@email.com,+1-555-2013,+1-555-2014,234 Maple Ave,Unit 8,Miami,FL,USA,33101,,,SILVER,1500,ACTIVE,CLEAR,GOOD,Wedding planner frequent customer
+CUST008,BUSINESS,Sound & Vision Co,Michael,Brown,michael@soundvision.com,+1-555-2015,+1-555-2016,678 Music Row,,Nashville,TN,USA,37201,SOUN-789-012345,NET30,GOLD,25000,ACTIVE,CLEAR,EXCELLENT,Audio equipment rental for events
+CUST009,INDIVIDUAL,,Lisa,Anderson,lisa.anderson@email.com,+1-555-2017,+1-555-2018,901 Cedar Street,,Denver,CO,USA,80201,,,BRONZE,500,ACTIVE,WARNING,POOR,Late payment history
+CUST010,BUSINESS,Event Masters Pro,Patricia,Martinez,patricia@eventmasters.com,+1-555-2019,+1-555-2020,345 Conference Center,,Austin,TX,USA,78701,EVEN-012-345678,NET60,PLATINUM,75000,ACTIVE,CLEAR,EXCELLENT,Premium event management company
+
+## UNITS_OF_MEASUREMENT
+# Required: name
+# Optional: abbreviation, description
+name,abbreviation,description
+Piece,pcs,Individual countable items
+Kilogram,kg,Weight measurement in kilograms
+Meter,m,Length measurement in meters
+Liter,L,Volume measurement in liters
+Hour,hr,Time measurement in hours
+Day,day,Time measurement in days
+Week,wk,Time measurement in weeks
+Month,mo,Time measurement in months
+Square Meter,m²,Area measurement in square meters
+Cubic Meter,m³,Volume measurement in cubic meters
+Gram,g,Weight measurement in grams
+Centimeter,cm,Length measurement in centimeters
+Millimeter,mm,Length measurement in millimeters
+Pair,pair,Items sold in pairs
+Set,set,Items sold as a complete set
+Box,box,Items packaged in boxes
+Roll,roll,Items sold in rolls
+Foot,ft,Length measurement in feet
+Inch,in,Length measurement in inches
+Pound,lb,Weight measurement in pounds
+
+## BRANDS
+# Required: name
+# Optional: code, description
+name,code,description
+Sony,SONY,Japanese electronics manufacturer known for audio and video equipment
+Canon,CANON,Japanese imaging and optical products company
+Nikon,NIKON,Japanese optics and imaging products corporation
+Shure,SHURE,American audio equipment manufacturer
+Sennheiser,SENN,German audio equipment manufacturer
+Bose,BOSE,American audio equipment corporation
+JBL,JBL,Audio equipment manufacturer owned by Samsung
+Yamaha,YAMAHA,Japanese corporation manufacturing musical instruments and audio equipment
+Pioneer,PIONEER,Japanese electronics corporation
+Panasonic,PANA,Japanese electronics corporation
+Apple,APPLE,American technology company
+Microsoft,MSFT,American technology corporation
+Dell,DELL,American technology company
+HP,HP,American technology company
+Lenovo,LENOVO,Chinese technology company
+Samsung,SAMSUNG,South Korean electronics conglomerate
+LG,LG,South Korean electronics company
+Philips,PHILIPS,Dutch technology company
+Generic,GENERIC,Generic or unbranded products
+Professional,PRO,Professional grade equipment
+
+## CATEGORIES
+# Required: name
+# Optional: parent_category_name, display_order, is_leaf
+# For root categories: leave parent_category_name empty
+# For child categories: specify parent_category_name
+name,parent_category_name,display_order,is_leaf
+Electronics,,1,FALSE
+Audio,Electronics,1,FALSE
+Speakers,Audio,1,TRUE
+Microphones,Audio,2,TRUE
+Headphones,Audio,3,TRUE
+Amplifiers,Audio,4,TRUE
+Mixers,Audio,5,TRUE
+Video,Electronics,2,FALSE
+Cameras,Video,1,TRUE
+Projectors,Video,2,TRUE
+Monitors,Video,3,TRUE
+Video Recorders,Video,4,TRUE
+Lighting,Electronics,3,FALSE
+LED Lights,Lighting,1,TRUE
+Studio Lights,Lighting,2,TRUE
+Stage Lights,Lighting,3,TRUE
+Computers,Electronics,4,FALSE
+Laptops,Computers,1,TRUE
+Desktops,Computers,2,TRUE
+Tablets,Computers,3,TRUE
+Accessories,Computers,4,TRUE
+Furniture,,2,FALSE
+Tables,Furniture,1,TRUE
+Chairs,Furniture,2,TRUE
+Desks,Furniture,3,TRUE
+Storage,Furniture,4,TRUE
+Office Equipment,,3,FALSE
+Printers,Office Equipment,1,TRUE
+Scanners,Office Equipment,2,TRUE
+Phones,Office Equipment,3,TRUE
+Networking,Office Equipment,4,TRUE
+Event Equipment,,4,FALSE
+Tents,Event Equipment,1,TRUE
+Canopies,Event Equipment,2,TRUE
+Staging,Event Equipment,3,TRUE
+Decorations,Event Equipment,4,TRUE
+Tools,,5,FALSE
+Power Tools,Tools,1,TRUE
+Hand Tools,Tools,2,TRUE
+Measuring Tools,Tools,3,TRUE
+Safety Equipment,Tools,4,TRUE
+Transportation,,6,FALSE
+Vehicles,Transportation,1,TRUE
+Dollies,Transportation,2,TRUE
+Carts,Transportation,3,TRUE
+
+## LOCATIONS
+# Required: location_code, location_name, location_type, address, city, state, country
+# Optional: postal_code, contact_number, email, manager_email
+# location_type: STORE, WAREHOUSE, SERVICE_CENTER
+location_code,location_name,location_type,address,city,state,country,postal_code,contact_number,email,manager_email
+MAIN001,Main Store Downtown,STORE,123 Main Street,New York,NY,USA,10001,+1-555-3001,mainstore@company.com,manager1@company.com
+WARE001,Primary Warehouse,WAREHOUSE,456 Industrial Blvd,Los Angeles,CA,USA,90001,+1-555-3002,warehouse@company.com,manager2@company.com
+SERV001,Service Center North,SERVICE_CENTER,789 Service Road,Chicago,IL,USA,60601,+1-555-3003,service@company.com,manager3@company.com
+STORE002,West Coast Store,STORE,321 Commerce Ave,San Francisco,CA,USA,94102,+1-555-3004,weststore@company.com,manager4@company.com
+WARE002,Secondary Warehouse,WAREHOUSE,567 Storage Way,Seattle,WA,USA,98101,+1-555-3005,warehouse2@company.com,manager5@company.com
+STORE003,East Coast Store,STORE,890 Shopping Center,Miami,FL,USA,33101,+1-555-3006,eaststore@company.com,manager6@company.com
+SERV002,Service Center South,SERVICE_CENTER,234 Repair Street,Atlanta,GA,USA,30301,+1-555-3007,service2@company.com,manager7@company.com
+
+## ITEMS
+# Required: item_name, unit_name, reorder_point
+# Optional: sku (auto-generated if empty), brand_name, category_name, item_status, rental_rate_per_period, rental_period, sale_price, purchase_price, security_deposit, description, specifications, model_number, serial_number_required, warranty_period_days, is_rentable, is_saleable
+# item_status: ACTIVE, INACTIVE, DISCONTINUED
+# unit_name: must match a unit from UNITS_OF_MEASUREMENT
+# brand_name: must match a brand from BRANDS
+# category_name: must match a category from CATEGORIES
+# Default values: is_rentable=TRUE, is_saleable=FALSE, item_status=ACTIVE
+sku,item_name,unit_name,brand_name,category_name,item_status,rental_rate_per_period,rental_period,sale_price,purchase_price,security_deposit,reorder_point,description,specifications,model_number,serial_number_required,warranty_period_days,is_rentable,is_saleable
+SPKR001,Professional Studio Speakers,Pair,JBL,Speakers,ACTIVE,50.00,1,0.00,800.00,200.00,5,High-quality studio monitor speakers,Frequency Response: 20Hz-20kHz; Power: 100W,LSR308,FALSE,365,TRUE,FALSE
+MIC001,Wireless Microphone System,Set,Shure,Microphones,ACTIVE,25.00,1,0.00,400.00,100.00,10,Professional wireless microphone system,UHF frequency range; 100m range,SM58-LC,FALSE,365,TRUE,FALSE
+CAM001,4K Video Camera,Piece,Sony,Cameras,ACTIVE,75.00,1,0.00,1200.00,300.00,3,Professional 4K video camera,4K recording; 3-inch LCD screen,FX6,TRUE,730,TRUE,FALSE
+PROJ001,HD Projector,Piece,Panasonic,Projectors,ACTIVE,40.00,1,0.00,600.00,150.00,8,High-definition projector,1080p resolution; 3000 lumens,PT-VW545N,FALSE,365,TRUE,FALSE
+LIGHT001,LED Studio Light Kit,Set,Sony,LED Lights,ACTIVE,30.00,1,0.00,350.00,75.00,12,Professional LED lighting kit,5600K color temperature; dimmable,HVL-LBPC,FALSE,365,TRUE,FALSE
+LAPTOP001,Professional Laptop,Piece,Dell,Laptops,ACTIVE,35.00,1,0.00,1000.00,250.00,6,High-performance laptop,Intel i7; 16GB RAM; 512GB SSD,XPS-15,TRUE,730,TRUE,FALSE
+TABLE001,Folding Conference Table,Piece,Generic,Tables,ACTIVE,15.00,1,0.00,200.00,50.00,15,Portable folding conference table,8 feet long; seats 8 people,CONF-8FT,FALSE,365,TRUE,FALSE
+CHAIR001,Executive Office Chair,Piece,Generic,Chairs,ACTIVE,10.00,1,0.00,150.00,25.00,20,Comfortable executive office chair,Leather upholstery; adjustable height,EXEC-001,FALSE,365,TRUE,FALSE
+PRINTER001,Color Laser Printer,Piece,HP,Printers,ACTIVE,20.00,1,0.00,300.00,75.00,8,High-quality color laser printer,Color printing; 20 ppm,LaserJet-CP1025,FALSE,365,TRUE,FALSE
+TENT001,Event Tent 20x20,Piece,Generic,Tents,ACTIVE,100.00,1,0.00,800.00,200.00,5,Large event tent,20x20 feet; waterproof,EVENT-2020,FALSE,365,TRUE,FALSE
+STAGE001,Portable Stage Platform,Piece,Generic,Staging,ACTIVE,60.00,1,0.00,400.00,100.00,8,Modular stage platform,4x8 feet; height adjustable,STAGE-4X8,FALSE,365,TRUE,FALSE
+DRILL001,Cordless Power Drill,Piece,Generic,Power Tools,ACTIVE,12.00,1,0.00,80.00,20.00,25,Professional cordless drill,18V battery; variable speed,DRILL-18V,FALSE,365,TRUE,FALSE
+MONITOR001,4K Computer Monitor,Piece,Samsung,Monitors,ACTIVE,25.00,1,0.00,300.00,75.00,10,High-resolution computer monitor,27-inch 4K display; USB-C,U28E590D,FALSE,365,TRUE,FALSE
+HEADPHONE001,Professional Headphones,Piece,Sennheiser,Headphones,ACTIVE,15.00,1,0.00,200.00,50.00,15,Studio-quality headphones,Closed-back design; 32 ohm,HD-280-PRO,FALSE,365,TRUE,FALSE
+AMPLIFIER001,Audio Amplifier,Piece,Yamaha,Amplifiers,ACTIVE,35.00,1,0.00,500.00,125.00,6,Professional audio amplifier,1000W power; multiple inputs,P7000S,FALSE,365,TRUE,FALSE
+MIXER001,Audio Mixing Console,Piece,Yamaha,Mixers,ACTIVE,45.00,1,0.00,600.00,150.00,4,Professional mixing console,16-channel; built-in effects,MG16XU,FALSE,365,TRUE,FALSE
+RECORDER001,Video Recorder,Piece,Panasonic,Video Recorders,ACTIVE,30.00,1,0.00,400.00,100.00,8,Professional video recorder,1080p recording; multiple formats,AG-CX10,FALSE,365,TRUE,FALSE
+CART001,Equipment Cart,Piece,Generic,Carts,ACTIVE,8.00,1,0.00,120.00,30.00,20,Mobile equipment cart,4-wheel cart; adjustable shelves,CART-4W,FALSE,365,TRUE,FALSE
+CANOPY001,Pop-up Canopy,Piece,Generic,Canopies,ACTIVE,20.00,1,0.00,150.00,40.00,12,Portable pop-up canopy,10x10 feet; UV protection,CANOPY-10X10,FALSE,365,TRUE,FALSE
+TABLET001,Professional Tablet,Piece,Apple,Tablets,ACTIVE,25.00,1,0.00,500.00,125.00,8,High-performance tablet,12.9-inch display; 256GB storage,iPad-Pro-12.9,TRUE,730,TRUE,FALSE

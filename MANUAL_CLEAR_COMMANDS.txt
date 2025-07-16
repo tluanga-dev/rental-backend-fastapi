@@ -1,0 +1,46 @@
+To clear all inventory and transaction data, run these commands:
+
+1. First, access your PostgreSQL database:
+
+docker-compose exec db psql -U postgres -d fastapi_db
+
+2. Once in the PostgreSQL prompt, copy and paste this entire block:
+
+BEGIN;
+DELETE FROM inspection_reports;
+DELETE FROM rental_return_lines;
+DELETE FROM rental_returns;
+DELETE FROM rental_return_events;
+DELETE FROM rental_lifecycles;
+DELETE FROM transaction_metadata;
+DELETE FROM transaction_lines;
+DELETE FROM transaction_headers;
+DELETE FROM stock_movements;
+DELETE FROM stock_levels;
+DELETE FROM inventory_units;
+COMMIT;
+
+3. To verify the data has been cleared, run:
+
+SELECT 
+    'transaction_headers' as table_name, COUNT(*) as record_count FROM transaction_headers
+UNION ALL
+SELECT 'transaction_lines', COUNT(*) FROM transaction_lines
+UNION ALL
+SELECT 'inventory_units', COUNT(*) FROM inventory_units
+UNION ALL
+SELECT 'stock_levels', COUNT(*) FROM stock_levels
+UNION ALL
+SELECT 'stock_movements', COUNT(*) FROM stock_movements;
+
+4. Exit PostgreSQL:
+
+\q
+
+Alternative single-line command (run from terminal):
+
+docker-compose exec db psql -U postgres -d fastapi_db -c "BEGIN; DELETE FROM inspection_reports; DELETE FROM rental_return_lines; DELETE FROM rental_returns; DELETE FROM rental_return_events; DELETE FROM rental_lifecycles; DELETE FROM transaction_metadata; DELETE FROM transaction_lines; DELETE FROM transaction_headers; DELETE FROM stock_movements; DELETE FROM stock_levels; DELETE FROM inventory_units; COMMIT;"
+
+To check if data was cleared:
+
+docker-compose exec db psql -U postgres -d fastapi_db -c "SELECT 'transaction_headers' as table_name, COUNT(*) as count FROM transaction_headers UNION ALL SELECT 'transaction_lines', COUNT(*) FROM transaction_lines UNION ALL SELECT 'inventory_units', COUNT(*) FROM inventory_units UNION ALL SELECT 'stock_levels', COUNT(*) FROM stock_levels;"

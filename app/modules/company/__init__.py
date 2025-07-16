@@ -1,0 +1,1 @@
+"""Company module for managing company information."""

@@ -1,0 +1,49 @@
+To clear ONLY transaction headers and transaction lines (preserving inventory data):
+
+Method 1 - Single command:
+docker-compose exec db psql -U postgres -d fastapi_db -c "BEGIN; DELETE FROM rental_return_lines; DELETE FROM rental_returns; DELETE FROM rental_return_events; DELETE FROM rental_lifecycles; DELETE FROM transaction_metadata; DELETE FROM transaction_lines; DELETE FROM transaction_headers; COMMIT;"
+
+Method 2 - Using SQL file:
+docker-compose exec -T db psql -U postgres -d fastapi_db < scripts/clear_transactions_only.sql
+
+Method 3 - Interactive:
+1. Connect to database:
+   docker-compose exec db psql -U postgres -d fastapi_db
+
+2. Run these commands:
+   BEGIN;
+   DELETE FROM rental_return_lines;
+   DELETE FROM rental_returns;
+   DELETE FROM rental_return_events;
+   DELETE FROM rental_lifecycles;
+   DELETE FROM transaction_metadata;
+   DELETE FROM transaction_lines;
+   DELETE FROM transaction_headers;
+   COMMIT;
+
+3. Verify transaction data is cleared:
+   SELECT 'transaction_headers' as table, COUNT(*) FROM transaction_headers
+   UNION ALL
+   SELECT 'transaction_lines', COUNT(*) FROM transaction_lines;
+
+4. Verify inventory data is preserved:
+   SELECT 'inventory_units' as table, COUNT(*) FROM inventory_units
+   UNION ALL
+   SELECT 'stock_levels', COUNT(*) FROM stock_levels;
+
+5. Exit:
+   \q
+
+This will clear:
+- All transaction headers
+- All transaction lines
+- All rental returns and related data
+- All transaction metadata
+
+This will preserve:
+- Inventory units
+- Stock levels
+- Stock movements
+- Item master data
+- Customer data
+- Supplier data
