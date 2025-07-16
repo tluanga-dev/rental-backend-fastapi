@@ -664,5 +664,86 @@ async def get_supported_currencies():
     return SUPPORTED_CURRENCIES
 
 
+# Company Information schemas
+class CompanyInfo(BaseModel):
+    """Schema for company information."""
+    company_name: str = Field(..., description="Company name")
+    company_address: Optional[str] = Field(None, description="Company address")
+    company_email: Optional[str] = Field(None, description="Company email")
+    company_phone: Optional[str] = Field(None, description="Company phone")
+    company_gst_no: Optional[str] = Field(None, description="Company GST number")
+    company_registration_number: Optional[str] = Field(None, description="Company registration number")
+
+
+class CompanyInfoUpdate(BaseModel):
+    """Schema for updating company information."""
+    company_name: Optional[str] = Field(None, description="Company name")
+    company_address: Optional[str] = Field(None, description="Company address")
+    company_email: Optional[str] = Field(None, description="Company email")
+    company_phone: Optional[str] = Field(None, description="Company phone")
+    company_gst_no: Optional[str] = Field(None, description="Company GST number")
+    company_registration_number: Optional[str] = Field(None, description="Company registration number")
+
+
+# Company Information endpoints
+@router.get("/company", response_model=CompanyInfo)
+async def get_company_info(
+    service: SystemService = Depends(get_system_service)
+):
+    """Get company information from system settings."""
+    try:
+        company_info = CompanyInfo(
+            company_name=await service.get_setting_value("company_name", "Your Company"),
+            company_address=await service.get_setting_value("company_address", ""),
+            company_email=await service.get_setting_value("company_email", ""),
+            company_phone=await service.get_setting_value("company_phone", ""),
+            company_gst_no=await service.get_setting_value("company_gst_no", ""),
+            company_registration_number=await service.get_setting_value("company_registration_number", "")
+        )
+        return company_info
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.put("/company", response_model=CompanyInfo)
+async def update_company_info(
+    company_data: CompanyInfoUpdate,
+    updated_by: UUID = Query(..., description="User ID updating the company info"),
+    service: SystemService = Depends(get_system_service)
+):
+    """Update company information in system settings."""
+    try:
+        # Update each field if provided
+        if company_data.company_name is not None:
+            await service.update_setting("company_name", company_data.company_name, updated_by)
+        if company_data.company_address is not None:
+            await service.update_setting("company_address", company_data.company_address, updated_by)
+        if company_data.company_email is not None:
+            await service.update_setting("company_email", company_data.company_email, updated_by)
+        if company_data.company_phone is not None:
+            await service.update_setting("company_phone", company_data.company_phone, updated_by)
+        if company_data.company_gst_no is not None:
+            await service.update_setting("company_gst_no", company_data.company_gst_no, updated_by)
+        if company_data.company_registration_number is not None:
+            await service.update_setting("company_registration_number", company_data.company_registration_number, updated_by)
+        
+        # Return updated company info
+        company_info = CompanyInfo(
+            company_name=await service.get_setting_value("company_name", "Your Company"),
+            company_address=await service.get_setting_value("company_address", ""),
+            company_email=await service.get_setting_value("company_email", ""),
+            company_phone=await service.get_setting_value("company_phone", ""),
+            company_gst_no=await service.get_setting_value("company_gst_no", ""),
+            company_registration_number=await service.get_setting_value("company_registration_number", "")
+        )
+        return company_info
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 # Include whitelist management routes
 router.include_router(whitelist_router, prefix="/whitelist", tags=["Whitelist Management"])

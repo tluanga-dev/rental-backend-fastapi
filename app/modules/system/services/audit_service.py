@@ -257,7 +257,7 @@ class AuditService:
                 "method": method,
                 "status": status,
                 "reference": reference,
-                **additional_details or {}
+                **(additional_details or {})
             }
         )
         

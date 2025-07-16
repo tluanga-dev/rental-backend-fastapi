@@ -27,6 +27,10 @@ __all__ = [
     "NewSaleResponse",
     "SaleItemCreate",
     
+    # Rentable items schemas
+    "RentableItemResponse",
+    "LocationAvailability",
+    
     # From returns schemas  
     "SaleReturnCreate",
     "PurchaseReturnCreate",

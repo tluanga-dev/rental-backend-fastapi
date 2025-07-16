@@ -29,7 +29,6 @@ from app.modules.transactions.models.events import TransactionEvent
 from app.modules.rentals.models import RentalReturn, RentalReturnLine, InspectionReport
 from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
 from app.modules.system.models import SystemSetting, SystemBackup, AuditLog
-from app.modules.company.models import Company
 from app.modules.auth.routes import router as auth_router
 from app.modules.users.routes import router as users_router
 from app.modules.master_data.routes import router as master_data_router
@@ -40,7 +39,6 @@ from app.modules.transactions.routes import router as transactions_router, retur
 from app.modules.rentals.routes import router as rentals_router
 from app.modules.analytics.routes import router as analytics_router
 from app.modules.system.routes import router as system_router
-from app.modules.company.routes import router as company_router
 
 # Import centralized logging configuration
 from app.core.logging_config import setup_application_logging, get_application_logger
@@ -106,10 +104,6 @@ app = FastAPI(
         {
             "name": "System",
             "description": "System administration operations"
-        },
-        {
-            "name": "company",
-            "description": "Company information management"
         }
     ]
 )
@@ -162,7 +156,6 @@ app.include_router(returns_router, prefix="/api/transactions", tags=["Returns"])
 app.include_router(rentals_router, prefix="/api/rentals", tags=["Rental Management"])
 app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(system_router, prefix="/api/system", tags=["System"])
-app.include_router(company_router, prefix="/api/company", tags=["company"])
 
 # API v1 routes (for backward compatibility)
 app.include_router(suppliers_router, prefix="/api/v1/suppliers", tags=["Suppliers V1"])

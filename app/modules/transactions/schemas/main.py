@@ -1013,3 +1013,59 @@ class NewSaleResponse(BaseModel):
     data: dict = Field(..., description="Sale transaction data")
     transaction_id: UUID = Field(..., description="Created transaction ID")
     transaction_number: str = Field(..., description="Generated transaction number")
+
+
+class LocationAvailability(BaseModel):
+    """Location-wise availability information for rentable items."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    location_id: UUID = Field(..., description="Location ID")
+    location_name: str = Field(..., description="Location name")
+    available_quantity: float = Field(..., description="Available quantity at this location")
+
+
+class BrandNested(BaseModel):
+    """Nested brand information for rentable items."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+
+
+class CategoryNested(BaseModel):
+    """Nested category information for rentable items."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+
+
+class UnitOfMeasurementNested(BaseModel):
+    """Nested unit of measurement information for rentable items."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    code: Optional[str] = Field(None, description="Unit abbreviation/code")
+
+
+class RentableItemResponse(BaseModel):
+    """Rentable item with stock position across locations."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID = Field(..., description="Item ID")
+    sku: str = Field(..., description="Stock Keeping Unit")
+    item_name: str = Field(..., description="Item name")
+    rental_rate_per_period: Decimal = Field(..., description="Rental rate per period")
+    rental_period: str = Field(..., description="Rental period (number of periods)")
+    security_deposit: Decimal = Field(..., description="Security deposit amount")
+    total_available_quantity: float = Field(..., description="Total available quantity across all locations")
+    brand: Optional[BrandNested] = Field(None, description="Brand information")
+    category: Optional[CategoryNested] = Field(None, description="Category information")
+    unit_of_measurement: UnitOfMeasurementNested = Field(..., description="Unit of measurement")
+    location_availability: List[LocationAvailability] = Field(..., description="Availability breakdown by location")

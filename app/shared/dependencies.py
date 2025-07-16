@@ -180,12 +180,6 @@ async def get_system_service(
     return SystemService(session)
 
 
-async def get_company_service(
-    company_repo = Depends(get_company_repository)
-):
-    """Get company service instance."""
-    from app.modules.company.service import CompanyService
-    return CompanyService(company_repo)
 
 
 
@@ -226,10 +220,6 @@ async def get_location_repository(session: AsyncSessionDep):
     return LocationRepository(session)
 
 
-async def get_company_repository(session: AsyncSessionDep):
-    """Get company repository instance."""
-    from app.modules.company.repository import CompanyRepository
-    return CompanyRepository(session)
 
 
 # API Key dependency (for external integrations)
@@ -285,5 +275,4 @@ __all__ = [
     "get_location_service",
     "get_unit_service",
     "get_unit_of_measurement_service",
-    "get_company_service",
 ]

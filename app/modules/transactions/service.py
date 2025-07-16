@@ -50,6 +50,8 @@ from app.modules.transactions.schemas import (
     SaleItemCreate,
     NewSaleRequest,
     NewSaleResponse,
+    RentableItemResponse,
+    LocationAvailability,
 )
 from app.modules.customers.repository import CustomerRepository
 from app.modules.inventory.repository import ItemRepository, InventoryUnitRepository
@@ -1544,3 +1546,118 @@ class TransactionService:
             unit = available_units[i]
             unit.mark_as_sold(updated_by=f"Transaction {transaction_id}")
             await self.session.flush()  # Flush to ensure changes are applied
+    
+    async def get_rentable_items_with_availability(
+        self,
+        location_id: Optional[UUID] = None,
+        category_id: Optional[UUID] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[RentableItemResponse]:
+        """
+        Get rentable items with their current stock availability across locations.
+        
+        Args:
+            location_id: Optional filter by specific location
+            category_id: Optional filter by category
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+            
+        Returns:
+            List of rentable items with availability breakdown by location
+        """
+        from sqlalchemy import select, and_, func
+        from sqlalchemy.orm import selectinload, joinedload
+        from app.modules.master_data.item_master.models import Item, ItemStatus
+        from app.modules.master_data.locations.models import Location
+        
+        # Build the main query for rentable items
+        query = (
+            select(Item)
+            .where(
+                and_(
+                    Item.is_rentable == True,
+                    Item.item_status == ItemStatus.ACTIVE.value,
+                    Item.is_active == True
+                )
+            )
+            .options(
+                selectinload(Item.brand),
+                selectinload(Item.category),
+                selectinload(Item.unit_of_measurement),
+                selectinload(Item.stock_levels)
+            )
+        )
+        
+        # Apply category filter if provided
+        if category_id:
+            query = query.where(Item.category_id == category_id)
+        
+        # Execute query to get items
+        result = await self.session.execute(query.offset(skip).limit(limit))
+        items = result.scalars().all()
+        
+        # Process items to build response
+        rentable_items = []
+        
+        for item in items:
+            # Get stock levels for this item
+            stock_query = (
+                select(StockLevel, Location)
+                .join(Location, Location.id == StockLevel.location_id)
+                .where(
+                    and_(
+                        StockLevel.item_id == item.id,
+                        StockLevel.quantity_available > 0,
+                        StockLevel.is_active == True,
+                        Location.is_active == True
+                    )
+                )
+            )
+            
+            # Apply location filter if provided
+            if location_id:
+                stock_query = stock_query.where(StockLevel.location_id == location_id)
+            
+            stock_result = await self.session.execute(stock_query)
+            stock_levels = stock_result.all()
+            
+            # Skip items with no available stock
+            if not stock_levels:
+                continue
+            
+            # Build location availability list
+            location_availability = []
+            total_available = 0
+            
+            for stock_level, location in stock_levels:
+                available_qty = float(stock_level.quantity_available)
+                if available_qty > 0:
+                    location_availability.append(
+                        LocationAvailability(
+                            location_id=location.id,
+                            location_name=location.location_name,
+                            available_quantity=available_qty
+                        )
+                    )
+                    total_available += available_qty
+            
+            # Only include items with actual availability
+            if total_available > 0:
+                rentable_items.append(
+                    RentableItemResponse(
+                        id=item.id,
+                        sku=item.sku,
+                        item_name=item.item_name,
+                        rental_rate_per_period=item.rental_rate_per_period or Decimal("0"),
+                        rental_period=item.rental_period or "1",
+                        security_deposit=item.security_deposit or Decimal("0"),
+                        total_available_quantity=total_available,
+                        brand=item.brand if item.brand else None,
+                        category=item.category if item.category else None,
+                        unit_of_measurement=item.unit_of_measurement,
+                        location_availability=location_availability
+                    )
+                )
+        
+        return rentable_items

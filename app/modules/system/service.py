@@ -229,11 +229,61 @@ class SystemService:
                 "setting_key": "company_name",
                 "setting_name": "Company Name",
                 "setting_type": SettingType.STRING,
-                "setting_category": SettingCategory.GENERAL,
+                "setting_category": SettingCategory.BUSINESS,
                 "setting_value": "Your Company",
                 "default_value": "Your Company",
                 "description": "Name of the company using the system",
+                "display_order": "1"
+            },
+            {
+                "setting_key": "company_address",
+                "setting_name": "Company Address",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.BUSINESS,
+                "setting_value": "",
+                "default_value": "",
+                "description": "Company address",
+                "display_order": "2"
+            },
+            {
+                "setting_key": "company_email",
+                "setting_name": "Company Email",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.BUSINESS,
+                "setting_value": "",
+                "default_value": "",
+                "description": "Company email address",
                 "display_order": "3"
+            },
+            {
+                "setting_key": "company_phone",
+                "setting_name": "Company Phone",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.BUSINESS,
+                "setting_value": "",
+                "default_value": "",
+                "description": "Company phone number",
+                "display_order": "4"
+            },
+            {
+                "setting_key": "company_gst_no",
+                "setting_name": "Company GST Number",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.BUSINESS,
+                "setting_value": "",
+                "default_value": "",
+                "description": "Company GST registration number",
+                "display_order": "5"
+            },
+            {
+                "setting_key": "company_registration_number",
+                "setting_name": "Company Registration Number",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.BUSINESS,
+                "setting_value": "",
+                "default_value": "",
+                "description": "Company registration number",
+                "display_order": "6"
             },
             {
                 "setting_key": "timezone",
@@ -255,7 +305,7 @@ class SystemService:
                 "setting_value": "USD",
                 "default_value": "USD",
                 "description": "Default currency for transactions",
-                "display_order": "1"
+                "display_order": "7"
             },
             {
                 "setting_key": "business_hours_start",
@@ -265,7 +315,7 @@ class SystemService:
                 "setting_value": "09:00",
                 "default_value": "09:00",
                 "description": "Business hours start time",
-                "display_order": "2"
+                "display_order": "8"
             },
             {
                 "setting_key": "business_hours_end",
@@ -275,7 +325,7 @@ class SystemService:
                 "setting_value": "17:00",
                 "default_value": "17:00",
                 "description": "Business hours end time",
-                "display_order": "3"
+                "display_order": "9"
             },
             
             # Financial settings
