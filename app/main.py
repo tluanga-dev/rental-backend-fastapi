@@ -25,6 +25,7 @@ from app.modules.transactions.models import (
     TransactionHeader, TransactionLine, TransactionMetadata,
     RentalInspection, PurchaseCreditMemo
 )
+from app.modules.transactions.models.events import TransactionEvent
 from app.modules.rentals.models import RentalReturn, RentalReturnLine, InspectionReport
 from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
 from app.modules.system.models import SystemSetting, SystemBackup, AuditLog
@@ -39,9 +40,13 @@ from app.modules.rentals.routes import router as rentals_router
 from app.modules.analytics.routes import router as analytics_router
 from app.modules.system.routes import router as system_router
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Import centralized logging configuration
+from app.core.logging_config import setup_application_logging, get_application_logger
+from app.core.logging_middleware import TransactionLoggingMiddleware, RequestContextMiddleware
+
+# Initialize centralized logging
+setup_application_logging()
+logger = get_application_logger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -107,6 +112,10 @@ app = FastAPI(
 app.add_middleware(WhitelistMiddleware, enabled=settings.USE_WHITELIST_CONFIG)
 app.add_middleware(EndpointAccessMiddleware, enabled=settings.USE_WHITELIST_CONFIG)
 
+# Add transaction logging middleware
+app.add_middleware(TransactionLoggingMiddleware)
+app.add_middleware(RequestContextMiddleware)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -155,9 +164,15 @@ app.include_router(suppliers_router, prefix="/api/v1/suppliers", tags=["Supplier
 @app.on_event("startup")
 async def startup():
     logger.info(f"Starting {settings.PROJECT_NAME}")
+    logger.info("Comprehensive logging system initialized")
+    logger.info("Transaction audit logging enabled")
+    
     # Create tables if they don't exist
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+    logger.info("Database tables created/verified")
+    logger.info(f"{settings.PROJECT_NAME} startup complete")
 
 # Shutdown event
 @app.on_event("shutdown")

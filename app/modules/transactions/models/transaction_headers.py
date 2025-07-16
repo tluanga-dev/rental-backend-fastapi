@@ -138,6 +138,7 @@ class TransactionHeader(BaseModel):
     rental_returns = relationship("RentalReturn", back_populates="rental_transaction", lazy="select")
     metadata_entries = relationship("TransactionMetadata", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
     rental_lifecycle = relationship("RentalLifecycle", back_populates="transaction", uselist=False, lazy="select")
+    events = relationship("TransactionEvent", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
     
     # Indexes for efficient queries
     __table_args__ = (

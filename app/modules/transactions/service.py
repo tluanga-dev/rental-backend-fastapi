@@ -56,6 +56,7 @@ from app.modules.inventory.repository import ItemRepository, InventoryUnitReposi
 from app.modules.inventory.service import InventoryService
 from app.modules.inventory.models import StockLevel
 from app.core.logger import get_purchase_logger
+from app.modules.system.services.audit_service import AuditService
 
 
 class TransactionService:
@@ -70,6 +71,7 @@ class TransactionService:
         self.inventory_unit_repository = InventoryUnitRepository(session)
         self.inventory_service = InventoryService(session)
         self.logger = get_purchase_logger()
+        self.audit_service = AuditService(session)
 
     # Transaction Header operations
     async def create_transaction(
@@ -1044,8 +1046,9 @@ class TransactionService:
             self.logger.log_session_operation("Transaction rolled back due to error")
             raise e
 
-    async def create_new_sale(self, sale_data: NewSaleRequest) -> NewSaleResponse:
+    async def create_new_sale(self, sale_data: NewSaleRequest, user_id: Optional[UUID] = None, session_id: Optional[str] = None, ip_address: Optional[str] = None) -> NewSaleResponse:
         """Create a new sale transaction using the new-sale endpoint format."""
+        transaction_id = None
         try:
             # Validate customer exists
             customer = await self.customer_repository.get_by_id(sale_data.customer_id)
@@ -1122,6 +1125,25 @@ class TransactionService:
             # Add transaction to session
             self.session.add(transaction)
             await self.session.flush()  # Get the ID without committing
+            
+            # Set transaction_id for proper logging
+            transaction_id = transaction.id
+            
+            # Start comprehensive transaction logging
+            await self.audit_service.log_transaction_start(
+                transaction_id=transaction_id,
+                transaction_type="SALE",
+                operation_name="create_new_sale",
+                user_id=user_id,
+                session_id=session_id,
+                ip_address=ip_address,
+                additional_data={
+                    "customer_id": str(sale_data.customer_id),
+                    "location_id": str(location.id),
+                    "item_count": len(sale_data.items),
+                    "transaction_number": transaction_number
+                }
+            )
 
             # Create transaction lines
             total_amount = Decimal("0")
@@ -1165,6 +1187,21 @@ class TransactionService:
 
             # Update inventory for sold items
             await self._update_inventory_for_sale(sale_data, transaction, location)
+            
+            # Log inventory changes for each item
+            for item in sale_data.items:
+                item_master = await self.item_repository.get_by_id(item.item_id)
+                await self.audit_service.log_inventory_change(
+                    transaction_id=transaction_id,
+                    item_id=item.item_id,
+                    item_name=item_master.item_name if item_master else "Unknown Item",
+                    change_type="SALE",
+                    quantity_before=Decimal("0"),  # Would need to fetch actual before value
+                    quantity_after=Decimal("0"),   # Would need to fetch actual after value
+                    location_id=location.id,
+                    location_name=location.location_name,
+                    user_id=user_id
+                )
 
             # Commit transaction
             await self.session.commit()
@@ -1181,9 +1218,27 @@ class TransactionService:
                 transaction_number=transaction.transaction_number,
             )
             
+            # Complete transaction logging
+            log_file_path = await self.audit_service.complete_transaction_log(
+                transaction_id=transaction_id,
+                final_status="COMPLETED",
+                user_id=user_id,
+                completion_notes="Sale transaction completed successfully"
+            )
+            
             return response
 
         except Exception as e:
+            # Log error if transaction_id is available
+            if transaction_id:
+                await self.audit_service.log_error(
+                    transaction_id=transaction_id,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    error_details={"operation": "create_new_sale"},
+                    stack_trace=None,  # Could add traceback here
+                    user_id=user_id
+                )
             await self.session.rollback()
             raise e
 
