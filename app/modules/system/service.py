@@ -34,6 +34,21 @@ class SystemService:
         setting = await self.get_setting(setting_key)
         if setting:
             return setting.get_typed_value()
+        
+        # If setting doesn't exist and it's a company-related setting, try to create it
+        if setting_key.startswith("company_"):
+            try:
+                await self._create_missing_company_setting(setting_key)
+                # Try to get the setting again after creation
+                setting = await self.get_setting(setting_key)
+                if setting:
+                    return setting.get_typed_value()
+            except Exception as e:
+                # Log the error but continue with default value
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to create missing company setting {setting_key}: {str(e)}")
+        
         return default_value
     
     async def get_settings_by_category(self, category: SettingCategory) -> List[SystemSetting]:
@@ -762,6 +777,72 @@ class SystemService:
                 'completed_at': backup.completed_at.isoformat() if backup.completed_at else None
             }
         return None
+    
+    async def _create_missing_company_setting(self, setting_key: str) -> None:
+        """Create a missing company-related system setting with appropriate defaults."""
+        company_setting_configs = {
+            "company_name": {
+                "setting_name": "Company Name",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.BUSINESS,
+                "setting_value": "Your Company",
+                "default_value": "Your Company",
+                "description": "Name of the company using the system",
+                "display_order": "1"
+            },
+            "company_address": {
+                "setting_name": "Company Address",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.BUSINESS,
+                "setting_value": "",
+                "default_value": "",
+                "description": "Company address",
+                "display_order": "2"
+            },
+            "company_email": {
+                "setting_name": "Company Email",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.BUSINESS,
+                "setting_value": "",
+                "default_value": "",
+                "description": "Company email address",
+                "display_order": "3"
+            },
+            "company_phone": {
+                "setting_name": "Company Phone",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.BUSINESS,
+                "setting_value": "",
+                "default_value": "",
+                "description": "Company phone number",
+                "display_order": "4"
+            },
+            "company_gst_no": {
+                "setting_name": "Company GST Number",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.BUSINESS,
+                "setting_value": "",
+                "default_value": "",
+                "description": "Company GST registration number",
+                "display_order": "5"
+            },
+            "company_registration_number": {
+                "setting_name": "Company Registration Number",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.BUSINESS,
+                "setting_value": "",
+                "default_value": "",
+                "description": "Company registration number",
+                "display_order": "6"
+            }
+        }
+        
+        if setting_key in company_setting_configs:
+            config = company_setting_configs[setting_key]
+            await self.create_setting(
+                setting_key=setting_key,
+                **config
+            )
     
     async def _get_system_health(self) -> Dict[str, Any]:
         """Get system health information."""

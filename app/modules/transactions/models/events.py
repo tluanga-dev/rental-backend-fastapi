@@ -7,7 +7,7 @@ and maintaining a comprehensive audit trail in the database.
 
 from datetime import datetime
 from typing import Optional, Dict, Any
-from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey, Index
+from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey, Index, Integer
 from sqlalchemy.orm import relationship
 
 from app.db.base import BaseModel, UUIDType
@@ -56,7 +56,7 @@ class TransactionEvent(BaseModel):
     
     # Context information
     user_id = Column(
-        UUIDType(),
+        Integer,
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         comment="User who triggered this event"

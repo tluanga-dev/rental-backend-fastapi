@@ -172,6 +172,30 @@ async def startup():
         await conn.run_sync(Base.metadata.create_all)
         
     logger.info("Database tables created/verified")
+    
+    # Initialize system settings
+    try:
+        from app.modules.system.service import SystemService
+        from app.shared.dependencies import get_session
+        
+        # Get a database session for initialization
+        async for session in get_session():
+            try:
+                system_service = SystemService(session)
+                initialized_settings = await system_service.initialize_default_settings()
+                if initialized_settings:
+                    logger.info(f"Initialized {len(initialized_settings)} default system settings")
+                else:
+                    logger.info("System settings already initialized")
+                break  # Exit after first successful session
+            except Exception as e:
+                logger.error(f"Failed to initialize system settings: {str(e)}")
+                # Continue startup even if settings initialization fails
+                break
+    except Exception as e:
+        logger.error(f"Error during system settings initialization: {str(e)}")
+        # Continue startup even if there's an import or other error
+    
     logger.info(f"{settings.PROJECT_NAME} startup complete")
 
 # Shutdown event
