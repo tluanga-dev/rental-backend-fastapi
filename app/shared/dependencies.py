@@ -156,14 +156,6 @@ async def get_unit_of_measurement_service(
     return UnitOfMeasurementService(unit_repo)
 
 
-async def get_rental_service(
-    session: AsyncSessionDep
-):
-    """Get rental service instance."""
-    from app.modules.rentals.service import RentalService
-    return RentalService(session)
-
-
 async def get_analytics_service(
     session: AsyncSessionDep
 ):
@@ -206,12 +198,6 @@ async def get_transaction_repository(session: AsyncSessionDep):
     """Get transaction repository instance."""
     from app.modules.transactions.repository import TransactionRepository
     return TransactionRepository(session)
-
-
-async def get_rental_repository(session: AsyncSessionDep):
-    """Get rental repository instance."""
-    from app.modules.rentals.repository import RentalRepository
-    return RentalRepository(session)
 
 
 async def get_location_repository(session: AsyncSessionDep):

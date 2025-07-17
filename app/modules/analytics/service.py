@@ -25,7 +25,6 @@ from app.modules.analytics.schemas import (
 from app.modules.transactions.repository import TransactionHeaderRepository
 from app.modules.customers.repository import CustomerRepository
 from app.modules.inventory.repository import ItemRepository, InventoryUnitRepository
-from app.modules.rentals.repository import RentalReturnRepository
 
 
 class AnalyticsService:
@@ -41,7 +40,6 @@ class AnalyticsService:
         self.customer_repository = CustomerRepository(session)
         self.item_repository = ItemRepository(session)
         self.inventory_unit_repository = InventoryUnitRepository(session)
-        self.rental_return_repository = RentalReturnRepository(session)
     
     # Analytics Report operations
     async def create_report(self, report_data: AnalyticsReportCreate, generated_by: UUID) -> AnalyticsReportResponse:
@@ -233,24 +231,28 @@ class AnalyticsService:
     
     async def _generate_rentals_data(self, generation_request: ReportGenerationRequest) -> List[Dict[str, Any]]:
         """Generate rentals report data."""
-        # Get rental returns
-        returns = await self.rental_return_repository.get_all(
+        # Get rental transactions with returns
+        transactions = await self.transaction_repository.get_all(
             date_from=generation_request.start_date,
             date_to=generation_request.end_date,
             active_only=True
         )
         
         rental_data = []
-        for return_item in returns:
-            rental_data.append({
-                'return_id': str(return_item.id),
-                'return_date': return_item.return_date.isoformat(),
-                'return_type': return_item.return_type,
-                'status': return_item.return_status,
-                'total_late_fee': float(return_item.total_late_fee),
-                'total_damage_fee': float(return_item.total_damage_fee),
-                'total_refund': float(return_item.total_refund_amount)
-            })
+        for transaction in transactions:
+            if transaction.transaction_type == "RENTAL" and transaction.metadata_entries:
+                # Look for return metadata
+                for metadata in transaction.metadata_entries:
+                    if metadata.key == "return_data":
+                        return_data = metadata.value
+                        rental_data.append({
+                            'transaction_id': str(transaction.id),
+                            'return_date': transaction.transaction_date.isoformat(),
+                            'status': transaction.status,
+                            'total_amount': float(transaction.total_amount),
+                            'return_details': return_data
+                        })
+                        break
         
         return rental_data
     
@@ -689,7 +691,6 @@ class AnalyticsService:
     
     async def _calculate_return_rate(self) -> Decimal:
         """Calculate return rate percentage."""
-        returns = await self.rental_return_repository.get_all(active_only=True)
         transactions = await self.transaction_repository.get_all(active_only=True)
         
         if not transactions:
@@ -699,7 +700,16 @@ class AnalyticsService:
         if not rental_transactions:
             return Decimal("0")
         
-        return_rate = (len(returns) / len(rental_transactions)) * 100
+        # Count rental transactions that have return metadata
+        returned_rentals = 0
+        for transaction in rental_transactions:
+            if transaction.metadata_entries:
+                for metadata in transaction.metadata_entries:
+                    if metadata.key == "return_data":
+                        returned_rentals += 1
+                        break
+        
+        return_rate = (returned_rentals / len(rental_transactions)) * 100
         return Decimal(str(return_rate)).quantize(Decimal('0.01'))
     
     async def _update_or_create_metric(

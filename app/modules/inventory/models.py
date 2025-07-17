@@ -107,8 +107,8 @@ class InventoryUnit(BaseModel):
     item = relationship("Item", back_populates="inventory_units", lazy="select")
     # location = relationship("Location", back_populates="inventory_units", lazy="select")  # Temporarily disabled
     # transaction_lines = relationship("TransactionLine", back_populates="inventory_unit", lazy="select")  # Temporarily disabled
-    return_lines = relationship("RentalReturnLine", back_populates="inventory_unit", lazy="select")
-    inspection_reports = relationship("InspectionReport", back_populates="inventory_unit", lazy="select")
+    # return_lines = relationship("RentalReturnLine", back_populates="inventory_unit", lazy="select")  # Disabled - no model exists
+    # inspection_reports = relationship("InspectionReport", back_populates="inventory_unit", lazy="select")  # Disabled - no model exists
     
     # Indexes for efficient queries
     __table_args__ = (

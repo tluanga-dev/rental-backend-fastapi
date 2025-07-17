@@ -218,6 +218,39 @@ async def create_new_sale(
         )
 
 
+# Rentable items endpoint
+@router.get("/rentable-items", response_model=List[RentableItemResponse])
+async def get_rentable_items(
+    location_id: Optional[UUID] = Query(None, description="Filter by specific location"),
+    category_id: Optional[UUID] = Query(None, description="Filter by category"),
+    skip: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of items to return"),
+    service: TransactionService = Depends(get_transaction_service),
+):
+    """
+    Get rentable items with current stock availability by location.
+    
+    This endpoint returns all items that are:
+    - Marked as rentable (is_rentable=True)
+    - Active status
+    - Have available quantity > 0 in at least one location
+    
+    The response includes:
+    - Item details (SKU, name, rental rate, security deposit)
+    - Total available quantity across all locations
+    - Breakdown of availability by location
+    - Related information (brand, category, unit of measurement)
+    
+    Use this endpoint when building rental forms to show available items.
+    """
+    return await service.get_rentable_items_with_availability(
+        location_id=location_id,
+        category_id=category_id,
+        skip=skip,
+        limit=limit
+    )
+
+
 @router.get("/{transaction_id}", response_model=TransactionHeaderResponse)
 async def get_transaction(
     transaction_id: UUID, service: TransactionService = Depends(get_transaction_service)
@@ -583,37 +616,6 @@ async def get_rental_transactions_due_for_return(
     return await service.get_rental_transactions_due_for_return(as_of_date)
 
 
-# Rentable items endpoint
-@router.get("/rentable-items", response_model=List[RentableItemResponse])
-async def get_rentable_items(
-    location_id: Optional[UUID] = Query(None, description="Filter by specific location"),
-    category_id: Optional[UUID] = Query(None, description="Filter by category"),
-    skip: int = Query(0, ge=0, description="Number of items to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of items to return"),
-    service: TransactionService = Depends(get_transaction_service),
-):
-    """
-    Get rentable items with current stock availability by location.
-    
-    This endpoint returns all items that are:
-    - Marked as rentable (is_rentable=True)
-    - Active status
-    - Have available quantity > 0 in at least one location
-    
-    The response includes:
-    - Item details (SKU, name, rental rate, security deposit)
-    - Total available quantity across all locations
-    - Breakdown of availability by location
-    - Related information (brand, category, unit of measurement)
-    
-    Use this endpoint when building rental forms to show available items.
-    """
-    return await service.get_rentable_items_with_availability(
-        location_id=location_id,
-        category_id=category_id,
-        skip=skip,
-        limit=limit
-    )
 
 
 # Purchase-specific endpoints (POST /purchases removed, keeping /new-purchase)

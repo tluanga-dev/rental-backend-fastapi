@@ -80,6 +80,14 @@
       "window": "1h"
     },
     "endpoint_specific": {
+      "/api/health": {
+        "requests": 30,
+        "window": "1m"
+      },
+      "/health": {
+        "requests": 30,
+        "window": "1m"
+      },
       "/api/auth/login": {
         "requests": 5,
         "window": "15m"

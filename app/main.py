@@ -26,7 +26,6 @@ from app.modules.transactions.models import (
     RentalInspection, PurchaseCreditMemo
 )
 from app.modules.transactions.models.events import TransactionEvent
-from app.modules.rentals.models import RentalReturn, RentalReturnLine, InspectionReport
 from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
 from app.modules.system.models import SystemSetting, SystemBackup, AuditLog
 from app.modules.auth.routes import router as auth_router
@@ -36,7 +35,6 @@ from app.modules.suppliers.routes import router as suppliers_router
 from app.modules.customers.routes import router as customers_router
 from app.modules.inventory.routes import router as inventory_router
 from app.modules.transactions.routes import router as transactions_router, returns_router
-from app.modules.rentals.routes import router as rentals_router
 from app.modules.analytics.routes import router as analytics_router
 from app.modules.system.routes import router as system_router
 
@@ -94,10 +92,6 @@ app = FastAPI(
             "description": "Return transaction management (Sales, Purchase, Rental returns)"
         },
         {
-            "name": "Rentals",
-            "description": "Rental management operations"
-        },
-        {
             "name": "Analytics",
             "description": "Analytics and reporting operations"
         },
@@ -153,7 +147,6 @@ app.include_router(customers_router, prefix="/api/customers", tags=["Customers"]
 app.include_router(inventory_router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions"])
 app.include_router(returns_router, prefix="/api/transactions", tags=["Returns"])
-app.include_router(rentals_router, prefix="/api/rentals", tags=["Rental Management"])
 app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(system_router, prefix="/api/system", tags=["System"])
 

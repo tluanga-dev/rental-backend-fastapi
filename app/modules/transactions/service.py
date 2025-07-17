@@ -1275,13 +1275,18 @@ class TransactionService:
 
             # Generate unique transaction number
             import random
-            transaction_number = (
-                f"REN-{rental_data.transaction_date.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
-            )
-
-            # Ensure uniqueness
-            while await self.transaction_repository.get_by_number(transaction_number):
-                transaction_number = f"REN-{rental_data.transaction_date.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+            if rental_data.reference_number:
+                transaction_number = rental_data.reference_number
+                # Check if reference number already exists
+                if await self.transaction_repository.get_by_number(transaction_number):
+                    raise ConflictError(f"Reference number '{transaction_number}' already exists")
+            else:
+                transaction_number = (
+                    f"REN-{rental_data.transaction_date.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+                )
+                # Ensure uniqueness
+                while await self.transaction_repository.get_by_number(transaction_number):
+                    transaction_number = f"REN-{rental_data.transaction_date.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
 
             # Create transaction header (no rental dates at header level in new structure)
             transaction = TransactionHeader(
@@ -1299,7 +1304,16 @@ class TransactionService:
                 tax_amount=Decimal("0"),
                 total_amount=Decimal("0"),
                 paid_amount=Decimal("0"),
-                deposit_amount=Decimal("0"),
+                deposit_amount=rental_data.deposit_amount or Decimal("0"),
+                # New delivery fields
+                delivery_required=rental_data.delivery_required,
+                delivery_address=rental_data.delivery_address,
+                delivery_date=rental_data.delivery_date,
+                delivery_time=rental_data.delivery_time,
+                # New pickup fields
+                pickup_required=rental_data.pickup_required,
+                pickup_date=rental_data.pickup_date,
+                pickup_time=rental_data.pickup_time,
             )
 
             # Add transaction to session

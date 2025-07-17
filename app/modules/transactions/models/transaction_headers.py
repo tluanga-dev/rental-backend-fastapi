@@ -5,8 +5,8 @@ Transaction Header model - main transaction records.
 from enum import Enum as PyEnum
 from typing import Optional, TYPE_CHECKING
 from decimal import Decimal
-from datetime import datetime, date
-from sqlalchemy import Column, String, Numeric, Boolean, Text, DateTime, Date, ForeignKey, Integer, Index, Enum, CheckConstraint
+from datetime import datetime, date, time
+from sqlalchemy import Column, String, Numeric, Boolean, Text, DateTime, Date, Time, ForeignKey, Integer, Index, Enum, CheckConstraint
 from sqlalchemy.orm import relationship
 from uuid import uuid4
 
@@ -15,7 +15,6 @@ from app.db.base import BaseModel, UUIDType
 if TYPE_CHECKING:
     from app.modules.transactions.models.lines import TransactionLine
     from app.modules.transactions.models.rental_lifecycle import RentalLifecycle
-    from app.modules.rentals.models import RentalReturn
     from app.modules.transactions.models.metadata import TransactionMetadata
 
 
@@ -129,13 +128,23 @@ class TransactionHeader(BaseModel):
     payment_reference = Column(String(100), nullable=True, comment="Payment reference")
     return_workflow_state = Column(String(50), nullable=True, comment="Return workflow state")
     
+    # Delivery fields
+    delivery_required = Column(Boolean, nullable=False, default=False, comment="Whether delivery is required")
+    delivery_address = Column(Text, nullable=True, comment="Delivery address if delivery is required")
+    delivery_date = Column(Date, nullable=True, comment="Scheduled delivery date")
+    delivery_time = Column(Time, nullable=True, comment="Scheduled delivery time")
+    
+    # Pickup fields
+    pickup_required = Column(Boolean, nullable=False, default=False, comment="Whether pickup is required")
+    pickup_date = Column(Date, nullable=True, comment="Scheduled pickup date")
+    pickup_time = Column(Time, nullable=True, comment="Scheduled pickup time")
+    
     # Relationships
     # customer = relationship("Customer", back_populates="transactions", lazy="select")  # Temporarily disabled
     # location = relationship("Location", back_populates="transactions", lazy="select")  # Temporarily disabled
     # sales_person = relationship("User", back_populates="transactions", lazy="select")  # Temporarily disabled
     reference_transaction = relationship("TransactionHeader", remote_side="TransactionHeader.id", lazy="select")
     transaction_lines = relationship("TransactionLine", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
-    rental_returns = relationship("RentalReturn", back_populates="rental_transaction", lazy="select")
     metadata_entries = relationship("TransactionMetadata", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
     rental_lifecycle = relationship("RentalLifecycle", back_populates="transaction", uselist=False, lazy="select")
     events = relationship("TransactionEvent", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
@@ -149,6 +158,10 @@ class TransactionHeader(BaseModel):
         Index("idx_customer_id", "customer_id"),
         Index("idx_location_id", "location_id"),
         Index("idx_reference_transaction", "reference_transaction_id"),
+        Index("idx_delivery_required", "delivery_required"),
+        Index("idx_pickup_required", "pickup_required"),
+        Index("idx_delivery_date", "delivery_date"),
+        Index("idx_pickup_date", "pickup_date"),
         CheckConstraint("total_amount >= 0", name="check_positive_total"),
         CheckConstraint("paid_amount >= 0", name="check_positive_paid"),
         CheckConstraint("paid_amount <= total_amount", name="check_paid_not_exceed_total"),

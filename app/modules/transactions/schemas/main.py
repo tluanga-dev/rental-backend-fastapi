@@ -1,5 +1,5 @@
 from typing import Optional, List, Any
-from datetime import datetime, date
+from datetime import datetime, date, time
 from decimal import Decimal
 from pydantic import BaseModel, Field, ConfigDict, field_validator, computed_field, model_validator
 from uuid import UUID
@@ -71,6 +71,18 @@ class TransactionHeaderResponse(BaseModel):
     notes: Optional[str]
     payment_method: Optional[PaymentMethod]
     payment_reference: Optional[str]
+    
+    # New delivery fields
+    delivery_required: bool
+    delivery_address: Optional[str]
+    delivery_date: Optional[date]
+    delivery_time: Optional[time]
+    
+    # New pickup fields
+    pickup_required: bool
+    pickup_date: Optional[date]
+    pickup_time: Optional[time]
+    
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -99,6 +111,12 @@ class TransactionHeaderResponse(BaseModel):
     @property
     def is_sale(self) -> bool:
         return self.transaction_type == TransactionType.SALE
+    
+    @computed_field
+    @property
+    def reference_number(self) -> str:
+        """Alias for transaction_number to match frontend expectations."""
+        return self.transaction_number
 
 
 
@@ -794,6 +812,21 @@ class NewRentalRequest(BaseModel):
     notes: Optional[str] = Field("", description="Additional notes")
     items: List[RentalItemCreate] = Field(..., min_length=1, description="Rental items")
     
+    # New delivery fields
+    delivery_required: bool = Field(False, description="Whether delivery is required")
+    delivery_address: Optional[str] = Field(None, description="Delivery address")
+    delivery_date: Optional[str] = Field(None, description="Delivery date in YYYY-MM-DD format")
+    delivery_time: Optional[str] = Field(None, description="Delivery time in HH:MM format")
+    
+    # New pickup fields
+    pickup_required: bool = Field(False, description="Whether pickup is required")
+    pickup_date: Optional[str] = Field(None, description="Pickup date in YYYY-MM-DD format")
+    pickup_time: Optional[str] = Field(None, description="Pickup time in HH:MM format")
+    
+    # Deposit amount (add reference_number alias for transaction_number)
+    deposit_amount: Optional[Decimal] = Field(None, ge=0, description="Security deposit amount")
+    reference_number: Optional[str] = Field(None, description="Reference number for the rental")
+    
     @field_validator("transaction_date")
     @classmethod
     def validate_transaction_date(cls, v):
@@ -822,6 +855,41 @@ class NewRentalRequest(BaseModel):
         if v not in valid_methods:
             raise ValueError(f"Invalid payment method. Must be one of: {', '.join(valid_methods)}")
         return v
+    
+    @field_validator("delivery_date", "pickup_date")
+    @classmethod
+    def validate_delivery_pickup_dates(cls, v):
+        """Validate delivery and pickup dates."""
+        if v is not None:
+            try:
+                from datetime import datetime
+                return datetime.strptime(v, "%Y-%m-%d").date()
+            except ValueError:
+                raise ValueError("Invalid date format. Use YYYY-MM-DD format.")
+        return v
+    
+    @field_validator("delivery_time", "pickup_time")
+    @classmethod
+    def validate_delivery_pickup_times(cls, v):
+        """Validate delivery and pickup times."""
+        if v is not None:
+            try:
+                from datetime import datetime
+                return datetime.strptime(v, "%H:%M").time()
+            except ValueError:
+                raise ValueError("Invalid time format. Use HH:MM format.")
+        return v
+    
+    @model_validator(mode="after")
+    def validate_delivery_pickup_requirements(self):
+        """Validate delivery and pickup requirements."""
+        if self.delivery_required and not self.delivery_address:
+            raise ValueError("Delivery address is required when delivery is enabled")
+        if self.delivery_required and not self.delivery_date:
+            raise ValueError("Delivery date is required when delivery is enabled")
+        if self.pickup_required and not self.pickup_date:
+            raise ValueError("Pickup date is required when pickup is enabled")
+        return self
 
 
 class NewRentalResponse(BaseModel):

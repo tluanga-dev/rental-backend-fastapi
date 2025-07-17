@@ -1,0 +1,52 @@
+{
+  "// Comment": "Complete Rental Transaction Payload - Frontend to Backend",
+  "// Endpoint": "POST /api/transactions/new-rental",
+  "// Note": "Frontend sends all these fields, backend processes core fields and ignores extended ones",
+  
+  "// === CORE FIELDS (Required by Backend) ===": "",
+  "transaction_date": "2024-07-17",
+  "customer_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "location_id": "5c6d7e8f-9012-3456-b7c8-9d0e1f2g3h4i",
+  "payment_method": "CASH",
+  "payment_reference": "REF-12345",
+  "notes": "Special handling required",
+  
+  "// === EXTENDED FIELDS (Frontend Only) ===": "",
+  "reference_number": "EVENT-2024-001",
+  "deposit_amount": 500.00,
+  "delivery_required": true,
+  "delivery_address": "123 Event Plaza, Metro City",
+  "delivery_date": "2024-07-18",
+  "delivery_time": "09:00",
+  "pickup_required": true,
+  "pickup_date": "2024-07-22",
+  "pickup_time": "17:00",
+  
+  "// === ITEMS ARRAY ===": "",
+  "items": [
+    {
+      "// === BACKEND PROCESSED FIELDS ===": "",
+      "item_id": "8b4a9c13-7892-4562-a3fc-1d963f77bcd5",
+      "quantity": 2,
+      "rental_period_value": 5,
+      "rental_start_date": "2024-07-18",
+      "rental_end_date": "2024-07-22",
+      "tax_rate": 8.5,
+      "discount_amount": 25.00,
+      "notes": "Handle with care",
+      
+      "// === FRONTEND EXTENDED FIELDS ===": "",
+      "rental_period_type": "DAILY",
+      "unit_rate": 25.00,
+      "discount_type": "PERCENTAGE",
+      "discount_value": 10.0,
+      "accessories": [
+        {
+          "item_id": "9c5a8d14-8903-5673-b4fd-2e074f88cde7",
+          "quantity": 2,
+          "description": "Speaker stands"
+        }
+      ]
+    }
+  ]
+}

@@ -4,7 +4,7 @@ Rental-specific Pydantic schemas for API requests and responses.
 
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from datetime import datetime, date
+from datetime import datetime, date, time
 from decimal import Decimal
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -239,6 +239,17 @@ class RentalTransactionResponse(BaseModel):
     deposit_paid: bool
     current_rental_status: Optional[str]
     customer_advance_balance: Decimal
+    
+    # New delivery fields
+    delivery_required: bool
+    delivery_address: Optional[str]
+    delivery_date: Optional[date]
+    delivery_time: Optional[time]
+    
+    # New pickup fields
+    pickup_required: bool
+    pickup_date: Optional[date]
+    pickup_time: Optional[time]
 
     # Lifecycle info
     lifecycle: Optional[RentalLifecycleResponse] = None
@@ -256,6 +267,11 @@ class RentalTransactionResponse(BaseModel):
         if not self.is_overdue:
             return 0
         return (date.today() - self.rental_end_date).days
+    
+    @property
+    def reference_number(self) -> str:
+        """Alias for transaction_number to match frontend expectations."""
+        return self.transaction_number
 
 
 class RentalDetailsResponse(BaseModel):
