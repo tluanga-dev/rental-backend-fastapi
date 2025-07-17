@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional, List
 from enum import Enum
 
-from app.core.database import Base
+from app.db.base import Base
 
 
 class RefreshToken(Base):

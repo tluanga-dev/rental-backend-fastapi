@@ -4,7 +4,7 @@ from sqlalchemy.sql import func
 from datetime import datetime
 from typing import Optional, List
 
-from app.core.database import Base
+from app.db.base import Base
 from app.modules.auth.models import user_roles_table, user_permissions_table, UserType, Role, Permission
 
 # Create UserRole alias for backward compatibility
@@ -185,5 +185,3 @@ class UserProfile(Base):
     
     def __repr__(self):
         return f"<UserProfile(id={self.id}, user_id={self.user_id})>"
-
-
