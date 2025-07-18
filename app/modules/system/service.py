@@ -437,6 +437,52 @@ class SystemService:
                 "default_value": "90",
                 "description": "Number of days to retain audit logs",
                 "display_order": "3"
+            },
+            
+            # Task Scheduling settings
+            {
+                "setting_key": "rental_status_check_enabled",
+                "setting_name": "Rental Status Check Enabled",
+                "setting_type": SettingType.BOOLEAN,
+                "setting_category": SettingCategory.SYSTEM,
+                "setting_value": "true",
+                "default_value": "true",
+                "description": "Enable automated rental status checking",
+                "is_system": True,
+                "display_order": "4"
+            },
+            {
+                "setting_key": "rental_status_check_time",
+                "setting_name": "Rental Status Check Time",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.SYSTEM,
+                "setting_value": "00:00",
+                "default_value": "00:00",
+                "description": "Time to run daily rental status check (HH:MM format)",
+                "is_system": True,
+                "display_order": "5"
+            },
+            {
+                "setting_key": "rental_status_log_retention_days",
+                "setting_name": "Rental Status Log Retention Days",
+                "setting_type": SettingType.INTEGER,
+                "setting_category": SettingCategory.SYSTEM,
+                "setting_value": "365",
+                "default_value": "365",
+                "description": "Number of days to retain rental status change logs",
+                "is_system": True,
+                "display_order": "6"
+            },
+            {
+                "setting_key": "task_scheduler_timezone",
+                "setting_name": "Task Scheduler Timezone",
+                "setting_type": SettingType.STRING,
+                "setting_category": SettingCategory.SYSTEM,
+                "setting_value": "UTC",
+                "default_value": "UTC",
+                "description": "Timezone for scheduled tasks",
+                "is_system": True,
+                "display_order": "7"
             }
         ]
         

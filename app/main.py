@@ -23,7 +23,8 @@ from app.modules.customers.models import Customer
 from app.modules.inventory.models import InventoryUnit, StockLevel, SKUSequence
 from app.modules.transactions.models import (
     TransactionHeader, TransactionLine, TransactionMetadata,
-    RentalInspection, PurchaseCreditMemo
+    RentalInspection, PurchaseCreditMemo, RentalLifecycle,
+    RentalReturnEvent, RentalItemInspection, RentalStatusLog
 )
 from app.modules.transactions.models.events import TransactionEvent
 from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
@@ -41,6 +42,9 @@ from app.modules.system.routes import router as system_router
 # Import centralized logging configuration
 from app.core.logging_config import setup_application_logging, get_application_logger
 from app.core.logging_middleware import TransactionLoggingMiddleware, RequestContextMiddleware
+
+# Import task scheduler
+from app.core.scheduler import task_scheduler
 
 # Initialize centralized logging
 setup_application_logging()
@@ -189,12 +193,29 @@ async def startup():
         logger.error(f"Error during system settings initialization: {str(e)}")
         # Continue startup even if there's an import or other error
     
+    # Initialize and start the task scheduler
+    try:
+        await task_scheduler.start()
+        logger.info("Task scheduler started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start task scheduler: {str(e)}")
+        # Continue startup even if scheduler fails to start
+    
     logger.info(f"{settings.PROJECT_NAME} startup complete")
 
 # Shutdown event
 @app.on_event("shutdown")
 async def shutdown():
     logger.info(f"Shutting down {settings.PROJECT_NAME}")
+    
+    # Stop the task scheduler
+    try:
+        await task_scheduler.stop()
+        logger.info("Task scheduler stopped successfully")
+    except Exception as e:
+        logger.error(f"Error stopping task scheduler: {str(e)}")
+    
+    logger.info("Shutdown complete")
 
 if __name__ == "__main__":
     uvicorn.run(

@@ -41,3 +41,6 @@ redis==5.0.1
 # Utilities
 python-dotenv==1.0.0
 Pillow==10.1.0
+
+# Background Tasks & Scheduling
+APScheduler==3.10.4

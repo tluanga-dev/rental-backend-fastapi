@@ -26,8 +26,10 @@ from .rental_lifecycle import (
     RentalLifecycle, 
     RentalReturnEvent, 
     RentalItemInspection,
+    RentalStatusLog,
     ReturnEventType,
-    InspectionCondition
+    InspectionCondition,
+    RentalStatusChangeReason
 )
 
 # Export all models for backward compatibility
@@ -54,6 +56,8 @@ __all__ = [
     "RentalLifecycle",
     "RentalReturnEvent", 
     "RentalItemInspection",
+    "RentalStatusLog",
     "ReturnEventType",
-    "InspectionCondition"
+    "InspectionCondition",
+    "RentalStatusChangeReason"
 ]

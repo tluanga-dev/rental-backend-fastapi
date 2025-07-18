@@ -22,6 +22,7 @@ from app.modules.transactions.models import (
     ReturnEventType,
     InspectionCondition
 )
+from app.modules.transactions.services.rental_status_updater import RentalStatusUpdater
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 import logging
 
@@ -209,6 +210,7 @@ class RentalReturnService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.status_service = RentalStatusService(session)
+        self.status_updater = RentalStatusUpdater(session)
     
     async def initiate_return(
         self,
@@ -343,6 +345,9 @@ class RentalReturnService:
         
         lifecycle = return_event.rental_lifecycle
         
+        # Get transaction with lines for total quantity calculation
+        transaction = await self.status_service.get_rental_transaction(lifecycle.transaction_id)
+        
         # Update return event with payment info
         return_event.payment_collected = payment_collected
         return_event.refund_issued = refund_issued
@@ -371,30 +376,20 @@ class RentalReturnService:
                     )
                 )
         
-        # Check if all items are returned and update status
-        transaction = await self.status_service.get_rental_transaction(lifecycle.transaction_id)
+        # Update rental status based on return event
         total_quantity = sum(line.quantity for line in transaction.transaction_lines)
         
         if lifecycle.total_returned_quantity >= total_quantity:
-            # All items returned - mark as completed
-            await self.status_service.update_rental_status(
-                lifecycle.transaction_id, 
-                RentalStatus.COMPLETED
-            )
+            # All items returned - mark event as full return
             return_event.event_type = ReturnEventType.FULL_RETURN.value
-        else:
-            # Partial return - update status accordingly
-            current_status = RentalStatus(lifecycle.current_status)
-            if current_status == RentalStatus.ACTIVE:
-                await self.status_service.update_rental_status(
-                    lifecycle.transaction_id, 
-                    RentalStatus.PARTIAL_RETURN
-                )
-            elif current_status == RentalStatus.LATE:
-                await self.status_service.update_rental_status(
-                    lifecycle.transaction_id, 
-                    RentalStatus.LATE_PARTIAL_RETURN
-                )
+        
+        # Use the status updater to recalculate and update status
+        await self.status_updater.update_status_from_return_event(
+            transaction_id=lifecycle.transaction_id,
+            return_event_id=return_event.id,
+            changed_by=return_event.processed_by,
+            notes=f"Status updated after processing return event"
+        )
         
         await self.session.commit()
         logger.info(f"Completed return event {return_event_id}")
@@ -454,6 +449,7 @@ class RentalService:
         self.session = session
         self.status_service = RentalStatusService(session)
         self.return_service = RentalReturnService(session)
+        self.status_updater = RentalStatusUpdater(session)
     
     async def get_active_rentals(
         self, 

@@ -211,3 +211,79 @@ class RentalItemInspection(BaseModel):
     def total_fees_assessed(self):
         """Calculate total fees assessed for this inspection."""
         return self.damage_fee_assessed + self.cleaning_fee_assessed + (self.replacement_cost or 0)
+
+
+class RentalStatusChangeReason(PyEnum):
+    """Reasons for rental status changes."""
+    SCHEDULED_UPDATE = "SCHEDULED_UPDATE"
+    RETURN_EVENT = "RETURN_EVENT"
+    MANUAL_UPDATE = "MANUAL_UPDATE"
+    EXTENSION = "EXTENSION"
+    LATE_FEE_APPLIED = "LATE_FEE_APPLIED"
+    DAMAGE_ASSESSMENT = "DAMAGE_ASSESSMENT"
+
+
+class RentalStatusLog(BaseModel):
+    """
+    Historical log of rental status changes for both headers and line items.
+    
+    Tracks all status transitions with context about why they occurred,
+    enabling comprehensive audit trails and status history reporting.
+    """
+    
+    __tablename__ = "rental_status_logs"
+    
+    # Primary identification
+    id = Column(UUIDType(), primary_key=True, default=uuid4, comment="Unique log entry identifier")
+    
+    # Entity identification
+    transaction_id = Column(UUIDType(), ForeignKey("transaction_headers.id"), nullable=False, comment="Transaction being tracked")
+    transaction_line_id = Column(UUIDType(), ForeignKey("transaction_lines.id"), nullable=True, comment="Specific line item (null for header-level changes)")
+    rental_lifecycle_id = Column(UUIDType(), ForeignKey("rental_lifecycles.id"), nullable=True, comment="Associated rental lifecycle")
+    
+    # Status change details
+    old_status = Column(String(30), nullable=True, comment="Previous status (null for initial status)")
+    new_status = Column(String(30), nullable=False, comment="New status after change")
+    change_reason = Column(String(30), nullable=False, comment="Reason for the status change")
+    change_trigger = Column(String(50), nullable=True, comment="What triggered the change (scheduled_job, return_event_id, etc.)")
+    
+    # Change context
+    changed_by = Column(UUIDType(), nullable=True, comment="User who initiated the change (null for system changes)")
+    changed_at = Column(DateTime, nullable=False, default=datetime.utcnow, comment="When the change occurred")
+    
+    # Additional context
+    notes = Column(Text, nullable=True, comment="Additional notes about the status change")
+    status_metadata = Column(JSON, nullable=True, comment="Additional context data (overdue days, return quantities, etc.)")
+    
+    # System tracking
+    system_generated = Column(Boolean, nullable=False, default=False, comment="Whether this change was system-generated")
+    batch_id = Column(String(50), nullable=True, comment="Batch ID for scheduled updates")
+    
+    # Relationships
+    transaction = relationship("TransactionHeader", lazy="select")
+    transaction_line = relationship("TransactionLine", lazy="select")
+    rental_lifecycle = relationship("RentalLifecycle", lazy="select")
+    
+    # Indexes
+    __table_args__ = (
+        Index("idx_status_log_transaction", "transaction_id"),
+        Index("idx_status_log_line", "transaction_line_id"),
+        Index("idx_status_log_changed_at", "changed_at"),
+        Index("idx_status_log_reason", "change_reason"),
+        Index("idx_status_log_batch", "batch_id"),
+        Index("idx_status_log_system", "system_generated"),
+    )
+    
+    def __repr__(self):
+        entity_type = "line" if self.transaction_line_id else "header"
+        return f"<RentalStatusLog(id={self.id}, {entity_type}, {self.old_status}->{self.new_status})>"
+    
+    @property
+    def is_header_change(self) -> bool:
+        """Check if this is a header-level status change."""
+        return self.transaction_line_id is None
+    
+    @property
+    def is_line_change(self) -> bool:
+        """Check if this is a line-level status change."""
+        return self.transaction_line_id is not None
