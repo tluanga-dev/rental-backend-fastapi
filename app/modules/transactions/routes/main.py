@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import date
 from decimal import Decimal
@@ -12,6 +12,7 @@ from app.modules.transactions.models import (
     TransactionStatus,
     PaymentStatus,
     LineItemType,
+    RentalStatus,
 )
 from app.modules.transactions.schemas import (
     TransactionHeaderCreate,
@@ -215,6 +216,60 @@ async def create_new_sale(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}",
+        )
+
+
+@router.get("/rentals", response_model=List[Dict[str, Any]])
+async def get_rental_transactions(
+    skip: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of items to return"),
+    customer_id: Optional[UUID] = Query(None, description="Filter by customer ID"),
+    location_id: Optional[UUID] = Query(None, description="Filter by location ID"),
+    status: Optional[TransactionStatus] = Query(None, description="Filter by transaction status"),
+    rental_status: Optional[RentalStatus] = Query(None, description="Filter by rental status"),
+    date_from: Optional[date] = Query(None, description="Filter by rental start date (from)"),
+    date_to: Optional[date] = Query(None, description="Filter by rental end date (to)"),
+    overdue_only: bool = Query(False, description="Show only overdue rentals"),
+    service: TransactionService = Depends(get_transaction_service),
+):
+    """
+    Get rental transactions with comprehensive filtering options.
+    
+    This endpoint provides rental-specific filtering and includes lifecycle information:
+    - Filter by customer, location, transaction status, or rental status
+    - Filter by rental date range (start/end dates)
+    - Show only overdue rentals
+    - Includes rental lifecycle information (current status, fees, etc.)
+    - Supports pagination
+    
+    Filters:
+    - customer_id: Filter by specific customer UUID
+    - location_id: Filter by specific location UUID  
+    - status: Filter by transaction status (DRAFT, CONFIRMED, COMPLETED, etc.)
+    - rental_status: Filter by rental status (ACTIVE, LATE, PARTIAL_RETURN, etc.)
+    - date_from/date_to: Filter by rental start/end date range
+    - overdue_only: Show only rentals that are past their end date
+    
+    Returns list of rental transactions with lifecycle information.
+    """
+    try:
+        return await service.get_rental_transactions(
+            skip=skip,
+            limit=limit,
+            customer_id=customer_id,
+            location_id=location_id,
+            status=status,
+            rental_status=rental_status,
+            date_from=date_from,
+            date_to=date_to,
+            overdue_only=overdue_only,
+        )
+    except (NotFoundError, ValidationError) as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving rental transactions: {str(e)}",
         )
 
 

@@ -14,6 +14,7 @@ from app.modules.transactions.models import (
     PaymentStatus,
     RentalPeriodUnit,
     LineItemType,
+    RentalStatus,
 )
 from app.modules.transactions.repository import (
     TransactionHeaderRepository,
@@ -1675,3 +1676,84 @@ class TransactionService:
                 )
         
         return rentable_items
+
+    async def get_rental_transactions(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        customer_id: Optional[UUID] = None,
+        location_id: Optional[UUID] = None,
+        status: Optional[TransactionStatus] = None,
+        rental_status: Optional[RentalStatus] = None,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        overdue_only: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get rental transactions with comprehensive filtering and lifecycle information.
+        
+        Args:
+            skip: Number of records to skip for pagination
+            limit: Maximum number of records to return
+            customer_id: Filter by customer UUID
+            location_id: Filter by location UUID
+            status: Filter by transaction status
+            rental_status: Filter by rental status
+            date_from: Filter by rental start date (from)
+            date_to: Filter by rental end date (to)
+            overdue_only: Show only overdue rentals
+            
+        Returns:
+            List of rental transaction dictionaries with lifecycle information
+        """
+        from app.modules.transactions.schemas.rentals import RentalTransactionResponse
+        
+        # Get rental transactions from repository
+        transactions = await self.transaction_repository.get_rentals_with_lifecycle(
+            skip=skip,
+            limit=limit,
+            customer_id=customer_id,
+            location_id=location_id,
+            status=status,
+            rental_status=rental_status,
+            date_from=date_from,
+            date_to=date_to,
+            overdue_only=overdue_only,
+            active_only=True,
+        )
+        
+        # Convert to response format
+        rental_responses = []
+        for transaction in transactions:
+            # Create rental transaction response
+            rental_response = RentalTransactionResponse.model_validate(transaction)
+            rental_responses.append(rental_response.model_dump())
+            
+        return rental_responses
+
+    async def count_rental_transactions(
+        self,
+        customer_id: Optional[UUID] = None,
+        location_id: Optional[UUID] = None,
+        status: Optional[TransactionStatus] = None,
+        rental_status: Optional[RentalStatus] = None,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        overdue_only: bool = False,
+    ) -> int:
+        """
+        Count rental transactions with the same filters as get_rental_transactions.
+        
+        Returns:
+            Total count of matching rental transactions
+        """
+        return await self.transaction_repository.count_rentals_with_lifecycle(
+            customer_id=customer_id,
+            location_id=location_id,
+            status=status,
+            rental_status=rental_status,
+            date_from=date_from,
+            date_to=date_to,
+            overdue_only=overdue_only,
+            active_only=True,
+        )
