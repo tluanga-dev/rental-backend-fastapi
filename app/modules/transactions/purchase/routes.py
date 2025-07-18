@@ -123,6 +123,8 @@ async def create_purchase_transaction(
     description="Get a list of purchase transactions with filtering and pagination support."
 )
 async def list_purchase_transactions(
+    current_user: Annotated[User, Depends(get_current_user)],
+    purchase_service: Annotated[PurchaseService, Depends(get_purchase_service)],
     start_date: Optional[date] = Query(None, description="Start date for filtering (YYYY-MM-DD)"),
     end_date: Optional[date] = Query(None, description="End date for filtering (YYYY-MM-DD)"),
     supplier_id: Optional[UUID] = Query(None, description="Filter by supplier ID"),
@@ -132,13 +134,11 @@ async def list_purchase_transactions(
     transaction_number: Optional[str] = Query(None, description="Filter by transaction number (partial match)"),
     min_amount: Optional[Decimal] = Query(None, ge=0, description="Minimum transaction amount"),
     max_amount: Optional[Decimal] = Query(None, ge=0, description="Maximum transaction amount"),
-    item_ids: Optional[List[UUID]] = Query(None, description="Filter by item IDs (transactions containing these items)"),
+    item_ids: Optional[List[UUID]] = Query(default=None, description="Filter by item IDs (transactions containing these items)"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum records to return"),
     sort_by: Optional[str] = Query(None, description="Sort by field (transaction_date, transaction_number, total_amount)"),
-    sort_order: Optional[str] = Query("desc", description="Sort order (asc, desc)"),
-    current_user: Annotated[User, Depends(get_current_user)],
-    purchase_service: Annotated[PurchaseService, Depends(get_purchase_service)]
+    sort_order: Optional[str] = Query("desc", description="Sort order (asc, desc)")
 ) -> PurchaseTransactionListResponse:
     """
     List purchase transactions with advanced filtering.
@@ -172,6 +172,31 @@ async def list_purchase_transactions(
     ```
     """
     try:
+        # Add validation
+        if start_date and end_date and start_date > end_date:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Start date cannot be after end date"
+            )
+        
+        if min_amount and max_amount and min_amount > max_amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Minimum amount cannot be greater than maximum amount"
+            )
+        
+        if sort_by and sort_by not in ["transaction_date", "transaction_number", "total_amount"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid sort_by field. Must be one of: transaction_date, transaction_number, total_amount"
+            )
+        
+        if sort_order and sort_order not in ["asc", "desc"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid sort_order. Must be 'asc' or 'desc'"
+            )
+        
         # Build filter request
         filter_request = PurchaseTransactionFilterRequest(
             start_date=start_date,
@@ -270,10 +295,10 @@ async def get_purchase_transaction(
 )
 async def get_purchase_transactions_by_supplier(
     supplier_id: UUID,
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum records to return"),
     current_user: Annotated[User, Depends(get_current_user)],
-    purchase_service: Annotated[PurchaseService, Depends(get_purchase_service)]
+    purchase_service: Annotated[PurchaseService, Depends(get_purchase_service)],
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum records to return")
 ) -> PurchaseTransactionListResponse:
     """
     Get purchase transactions for a specific supplier.
@@ -290,26 +315,44 @@ async def get_purchase_transactions_by_supplier(
     - Transaction summaries with enriched data
     """
     try:
-        transactions = await purchase_service.get_purchase_transactions_by_supplier(
+        result = await purchase_service.get_purchase_transactions_by_supplier(
             supplier_id=supplier_id,
             skip=skip,
             limit=limit
         )
         
-        return PurchaseTransactionListResponse(
-            success=True,
-            message=f"Purchase transactions for supplier {supplier_id} retrieved successfully",
-            data=transactions,
-            pagination={
-                "total": len(transactions),
-                "skip": skip,
-                "limit": limit,
-                "current_page": (skip // limit) + 1 if limit > 0 else 1,
-                "total_pages": (len(transactions) + limit - 1) // limit if limit > 0 else 1,
-                "has_next": skip + limit < len(transactions),
-                "has_prev": skip > 0
-            }
-        )
+        # Fix: Use the actual result structure if service returns structured data
+        if isinstance(result, dict) and "data" in result:
+            return PurchaseTransactionListResponse(
+                success=True,
+                message=f"Purchase transactions for supplier {supplier_id} retrieved successfully",
+                data=result["data"],
+                pagination=result.get("pagination", {
+                    "total": len(result["data"]),
+                    "skip": skip,
+                    "limit": limit,
+                    "current_page": (skip // limit) + 1 if limit > 0 else 1,
+                    "total_pages": (len(result["data"]) + limit - 1) // limit if limit > 0 else 1,
+                    "has_next": skip + limit < len(result["data"]),
+                    "has_prev": skip > 0
+                })
+            )
+        else:
+            # Fallback for simple list result
+            return PurchaseTransactionListResponse(
+                success=True,
+                message=f"Purchase transactions for supplier {supplier_id} retrieved successfully",
+                data=result,
+                pagination={
+                    "total": len(result),
+                    "skip": skip,
+                    "limit": limit,
+                    "current_page": (skip // limit) + 1 if limit > 0 else 1,
+                    "total_pages": (len(result) + limit - 1) // limit if limit > 0 else 1,
+                    "has_next": skip + limit < len(result),
+                    "has_prev": skip > 0
+                }
+            )
         
     except NotFoundError as e:
         raise HTTPException(
@@ -330,11 +373,11 @@ async def get_purchase_transactions_by_supplier(
     description="Get purchase transactions that contain specific items."
 )
 async def get_purchase_transactions_by_items(
-    item_ids: List[UUID] = Query(..., description="List of item IDs to filter by"),
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum records to return"),
     current_user: Annotated[User, Depends(get_current_user)],
-    purchase_service: Annotated[PurchaseService, Depends(get_purchase_service)]
+    purchase_service: Annotated[PurchaseService, Depends(get_purchase_service)],
+    item_ids: List[UUID] = Query(description="List of item IDs to filter by"),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum records to return")
 ) -> PurchaseTransactionListResponse:
     """
     Get purchase transactions containing specific items.
@@ -354,26 +397,51 @@ async def get_purchase_transactions_by_items(
     ```
     """
     try:
-        transactions = await purchase_service.get_purchase_transactions_by_items(
+        # Validate item_ids is not empty
+        if not item_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one item ID must be provided"
+            )
+        
+        result = await purchase_service.get_purchase_transactions_by_items(
             item_ids=item_ids,
             skip=skip,
             limit=limit
         )
         
-        return PurchaseTransactionListResponse(
-            success=True,
-            message=f"Purchase transactions containing specified items retrieved successfully",
-            data=transactions,
-            pagination={
-                "total": len(transactions),
-                "skip": skip,
-                "limit": limit,
-                "current_page": (skip // limit) + 1 if limit > 0 else 1,
-                "total_pages": (len(transactions) + limit - 1) // limit if limit > 0 else 1,
-                "has_next": skip + limit < len(transactions),
-                "has_prev": skip > 0
-            }
-        )
+        # Fix: Use the actual result structure if service returns structured data
+        if isinstance(result, dict) and "data" in result:
+            return PurchaseTransactionListResponse(
+                success=True,
+                message=f"Purchase transactions containing specified items retrieved successfully",
+                data=result["data"],
+                pagination=result.get("pagination", {
+                    "total": len(result["data"]),
+                    "skip": skip,
+                    "limit": limit,
+                    "current_page": (skip // limit) + 1 if limit > 0 else 1,
+                    "total_pages": (len(result["data"]) + limit - 1) // limit if limit > 0 else 1,
+                    "has_next": skip + limit < len(result["data"]),
+                    "has_prev": skip > 0
+                })
+            )
+        else:
+            # Fallback for simple list result
+            return PurchaseTransactionListResponse(
+                success=True,
+                message=f"Purchase transactions containing specified items retrieved successfully",
+                data=result,
+                pagination={
+                    "total": len(result),
+                    "skip": skip,
+                    "limit": limit,
+                    "current_page": (skip // limit) + 1 if limit > 0 else 1,
+                    "total_pages": (len(result) + limit - 1) // limit if limit > 0 else 1,
+                    "has_next": skip + limit < len(result),
+                    "has_prev": skip > 0
+                }
+            )
         
     except NotFoundError as e:
         raise HTTPException(

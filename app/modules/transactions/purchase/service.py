@@ -22,7 +22,7 @@ from app.modules.transactions.purchase.schemas import (
 from app.modules.transactions.repository import TransactionRepository, TransactionLineRepository
 from app.modules.suppliers.repository import SupplierRepository
 from app.modules.master_data.locations.repository import LocationRepository
-from app.modules.master_data.item_master.repository import ItemRepository
+from app.modules.master_data.item_master.repository import ItemMasterRepository
 
 
 class PurchaseService:
@@ -34,7 +34,7 @@ class PurchaseService:
         self.transaction_line_repository = TransactionLineRepository(session)
         self.supplier_repository = SupplierRepository(session)
         self.location_repository = LocationRepository(session)
-        self.item_repository = ItemRepository(session)
+        self.item_repository = ItemMasterRepository(session)
     
     async def list_purchase_transactions(
         self,
