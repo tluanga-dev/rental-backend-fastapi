@@ -21,12 +21,21 @@ from app.modules.master_data.item_master.models import Item
 from app.modules.suppliers.models import Supplier
 from app.modules.customers.models import Customer
 from app.modules.inventory.models import InventoryUnit, StockLevel, SKUSequence
-from app.modules.transactions.models import (
-    TransactionHeader, TransactionLine, TransactionMetadata,
-    RentalInspection, PurchaseCreditMemo, RentalLifecycle,
-    RentalReturnEvent, RentalItemInspection, RentalStatusLog
-)
-from app.modules.transactions.models.events import TransactionEvent
+
+# Import new modular transaction models
+from app.modules.transaction_base.models import TransactionHeader, TransactionLine
+from app.modules.sales.models import Sale, SaleLine
+from app.modules.purchases.models import Purchase, PurchaseLine
+from app.modules.rentals.models import Rental, RentalLine, RentalLifecycle, RentalExtension
+from app.modules.rent_returns.models import RentReturn, RentReturnLine, RentReturnInspection
+
+# Import old transaction models for backward compatibility
+# Note: Commented out to avoid table conflicts - legacy models still available via imports
+# from app.modules.transactions.models import (
+#     TransactionMetadata, RentalInspection, PurchaseCreditMemo,
+#     RentalReturnEvent, RentalItemInspection, RentalStatusLog
+# )
+# from app.modules.transactions.models.events import TransactionEvent
 from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
 from app.modules.system.models import SystemSetting, SystemBackup, AuditLog
 from app.modules.auth.routes import router as auth_router
@@ -35,8 +44,18 @@ from app.modules.master_data.routes import router as master_data_router
 from app.modules.suppliers.routes import router as suppliers_router
 from app.modules.customers.routes import router as customers_router
 from app.modules.inventory.routes import router as inventory_router
-from app.modules.transactions.routes import router as transactions_router, returns_router
-from app.modules.analytics.routes import router as analytics_router
+
+# Import new modular transaction routers
+from app.modules.sales.routes import router as sales_router
+from app.modules.purchases.routes import router as purchases_router
+from app.modules.rentals.routes import router as rentals_router
+from app.modules.rent_returns.routes import router as rent_returns_router
+
+# Import old transaction routers for backward compatibility
+# Note: Temporarily commented out to avoid model conflicts with new modular system
+# from app.modules.transactions.routes import router as transactions_router, returns_router
+# Temporarily commented out to avoid legacy transaction model conflicts
+# from app.modules.analytics.routes import router as analytics_router
 from app.modules.system.routes import router as system_router
 
 # Import centralized logging configuration
@@ -91,13 +110,30 @@ app = FastAPI(
             "description": "Inventory management operations"
         },
         {
-            "name": "Transactions",
-            "description": "Transaction management operations"
+            "name": "Sales",
+            "description": "Sales transaction management operations"
         },
         {
-            "name": "Returns",
-            "description": "Return transaction management (Sales, Purchase, Rental returns)"
+            "name": "Purchases",
+            "description": "Purchase transaction management operations"
         },
+        {
+            "name": "Rentals",
+            "description": "Rental transaction management operations"
+        },
+        {
+            "name": "Rent Returns",
+            "description": "Rental return transaction management operations"
+        },
+        # Legacy transaction tags temporarily commented out to avoid model conflicts
+        # {
+        #     "name": "Transactions",
+        #     "description": "Legacy transaction management operations (backward compatibility)"
+        # },
+        # {
+        #     "name": "Returns", 
+        #     "description": "Legacy return transaction management (backward compatibility)"
+        # },
         {
             "name": "Analytics",
             "description": "Analytics and reporting operations"
@@ -169,9 +205,20 @@ app.include_router(master_data_router, prefix="/api/master-data", tags=["Master 
 app.include_router(suppliers_router, prefix="/api/suppliers", tags=["Suppliers"])
 app.include_router(customers_router, prefix="/api/customers", tags=["Customers"])
 app.include_router(inventory_router, prefix="/api/inventory", tags=["Inventory"])
-app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions"])
-app.include_router(returns_router, prefix="/api/transactions", tags=["Returns"])
-app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
+
+# Include new modular transaction routers
+app.include_router(sales_router, prefix="/api", tags=["Sales"])
+app.include_router(purchases_router, prefix="/api", tags=["Purchases"])
+app.include_router(rentals_router, prefix="/api", tags=["Rentals"])
+app.include_router(rent_returns_router, prefix="/api", tags=["Rent Returns"])
+
+# Include legacy transaction routers for backward compatibility
+# Note: Temporarily commented out to avoid model conflicts with new modular system
+# app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions"])
+# app.include_router(returns_router, prefix="/api/transactions", tags=["Returns"])
+
+# Temporarily commented out to avoid legacy transaction model conflicts
+# app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(system_router, prefix="/api/system", tags=["System"])
 app.include_router(monitoring_router)  # Performance monitoring endpoints
 

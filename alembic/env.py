@@ -30,7 +30,19 @@ from app.modules.suppliers.models import Supplier
 from app.modules.customers.models import Customer
 from app.modules.master_data.item_master.models import Item
 from app.modules.inventory.models import InventoryUnit, StockLevel, SKUSequence, StockMovement
-from app.modules.transactions.models import TransactionHeader, TransactionLine
+# Import new modular transaction models
+from app.modules.transaction_base.models import TransactionHeader, TransactionLine
+from app.modules.sales.models import Sale, SaleLine
+from app.modules.purchases.models import Purchase, PurchaseLine  
+from app.modules.rentals.models import Rental, RentalLine, RentalLifecycle, RentalExtension
+from app.modules.rent_returns.models import RentReturn, RentReturnLine, RentReturnInspection
+
+# Import legacy transaction models for backward compatibility
+from app.modules.transactions.models import (
+    TransactionMetadata, RentalInspection, PurchaseCreditMemo,
+    RentalReturnEvent, RentalItemInspection, RentalStatusLog
+)
+from app.modules.transactions.models.events import TransactionEvent
 from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
 from app.modules.system.models import SystemSetting, SystemBackup, AuditLog
 
