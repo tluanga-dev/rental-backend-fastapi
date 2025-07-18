@@ -1,0 +1,23 @@
+{
+  "transaction_date": "2025-07-18",
+  "customer_id": "95d9e0d5-3086-4bfb-bbb2-736cafed6d43",
+  "location_id": "245bea95-c842-4066-9997-49e08abb0be0",
+  "payment_method": "CASH",
+  "payment_reference": "REF-2025-TEST-001",
+  "notes": "Test rental transaction via curl",
+  "deposit_amount": 500.00,
+  "delivery_required": false,
+  "pickup_required": false,
+  "items": [
+    {
+      "item_id": "3d69497d-1d48-45cd-8cfe-11abcd21e6c7",
+      "quantity": 1,
+      "rental_period_value": 7,
+      "tax_rate": 10.0,
+      "discount_amount": 0.00,
+      "rental_start_date": "2025-07-18",
+      "rental_end_date": "2025-07-25",
+      "notes": "JCB Land Mover rental for test"
+    }
+  ]
+}

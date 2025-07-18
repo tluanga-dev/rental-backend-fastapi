@@ -500,6 +500,156 @@ class TransactionHeaderRepository:
             "transactions_by_payment_status": payment_status_counts,
         }
 
+    async def get_rentals_with_lifecycle(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        customer_id: Optional[UUID] = None,
+        location_id: Optional[UUID] = None,
+        status: Optional[TransactionStatus] = None,
+        rental_status: Optional[RentalStatus] = None,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        overdue_only: bool = False,
+        active_only: bool = True,
+    ) -> List[TransactionHeader]:
+        """Get rental transactions with lifecycle information and filtering."""
+        
+        # Start with base query joining rental lifecycle
+        query = (
+            select(TransactionHeader)
+            .options(
+                joinedload(TransactionHeader.rental_lifecycle),
+                selectinload(TransactionHeader.transaction_lines)
+            )
+            .join(RentalLifecycle, TransactionHeader.id == RentalLifecycle.transaction_id, isouter=True)
+        )
+
+        # Apply filters
+        conditions = []
+        
+        # Always filter for RENTAL transactions
+        conditions.append(TransactionHeader.transaction_type == TransactionType.RENTAL.value)
+        
+        if active_only:
+            conditions.append(TransactionHeader.is_active == True)
+            
+        if customer_id:
+            conditions.append(TransactionHeader.customer_id == str(customer_id))
+            
+        if location_id:
+            conditions.append(TransactionHeader.location_id == str(location_id))
+            
+        if status:
+            conditions.append(TransactionHeader.status == status.value)
+            
+        if rental_status:
+            conditions.append(TransactionHeader.current_rental_status == rental_status.value)
+            
+        if date_from:
+            conditions.append(
+                TransactionHeader.rental_start_date >= date_from
+            )
+            
+        if date_to:
+            conditions.append(
+                TransactionHeader.rental_end_date <= date_to
+            )
+            
+        if overdue_only:
+            conditions.append(
+                and_(
+                    TransactionHeader.rental_end_date.is_not(None),
+                    TransactionHeader.rental_end_date < func.current_date(),
+                    TransactionHeader.current_rental_status.in_([
+                        RentalStatus.ACTIVE.value,
+                        RentalStatus.LATE.value,
+                        RentalStatus.PARTIAL_RETURN.value,
+                        RentalStatus.LATE_PARTIAL_RETURN.value
+                    ])
+                )
+            )
+
+        if conditions:
+            query = query.where(and_(*conditions))
+
+        # Order by transaction date (newest first)
+        query = query.order_by(desc(TransactionHeader.transaction_date))
+        
+        # Apply pagination
+        query = query.offset(skip).limit(limit)
+
+        result = await self.session.execute(query)
+        return result.unique().scalars().all()
+
+    async def count_rentals_with_lifecycle(
+        self,
+        customer_id: Optional[UUID] = None,
+        location_id: Optional[UUID] = None,
+        status: Optional[TransactionStatus] = None,
+        rental_status: Optional[RentalStatus] = None,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        overdue_only: bool = False,
+        active_only: bool = True,
+    ) -> int:
+        """Count rental transactions with the same filters."""
+        
+        query = (
+            select(func.count(TransactionHeader.id))
+            .join(RentalLifecycle, TransactionHeader.id == RentalLifecycle.transaction_id, isouter=True)
+        )
+
+        # Apply same filters as get_rentals_with_lifecycle
+        conditions = []
+        
+        conditions.append(TransactionHeader.transaction_type == TransactionType.RENTAL.value)
+        
+        if active_only:
+            conditions.append(TransactionHeader.is_active == True)
+            
+        if customer_id:
+            conditions.append(TransactionHeader.customer_id == str(customer_id))
+            
+        if location_id:
+            conditions.append(TransactionHeader.location_id == str(location_id))
+            
+        if status:
+            conditions.append(TransactionHeader.status == status.value)
+            
+        if rental_status:
+            conditions.append(TransactionHeader.current_rental_status == rental_status.value)
+            
+        if date_from:
+            conditions.append(
+                TransactionHeader.rental_start_date >= date_from
+            )
+            
+        if date_to:
+            conditions.append(
+                TransactionHeader.rental_end_date <= date_to
+            )
+            
+        if overdue_only:
+            conditions.append(
+                and_(
+                    TransactionHeader.rental_end_date.is_not(None),
+                    TransactionHeader.rental_end_date < func.current_date(),
+                    TransactionHeader.current_rental_status.in_([
+                        RentalStatus.ACTIVE.value,
+                        RentalStatus.LATE.value,
+                        RentalStatus.PARTIAL_RETURN.value,
+                        RentalStatus.LATE_PARTIAL_RETURN.value
+                    ])
+                )
+            )
+
+        if conditions:
+            query = query.where(and_(*conditions))
+
+        result = await self.session.execute(query)
+        return result.scalar() or 0
+
 
 class TransactionLineRepository:
     """Repository for TransactionLine operations."""
@@ -678,153 +828,3 @@ class TransactionLineRepository:
 
         await self.session.commit()
         return True
-
-    async def get_rentals_with_lifecycle(
-        self,
-        skip: int = 0,
-        limit: int = 100,
-        customer_id: Optional[UUID] = None,
-        location_id: Optional[UUID] = None,
-        status: Optional[TransactionStatus] = None,
-        rental_status: Optional[RentalStatus] = None,
-        date_from: Optional[date] = None,
-        date_to: Optional[date] = None,
-        overdue_only: bool = False,
-        active_only: bool = True,
-    ) -> List[TransactionHeader]:
-        """Get rental transactions with lifecycle information and filtering."""
-        
-        # Start with base query joining rental lifecycle
-        query = (
-            select(TransactionHeader)
-            .options(
-                joinedload(TransactionHeader.rental_lifecycle),
-                selectinload(TransactionHeader.transaction_lines)
-            )
-            .join(RentalLifecycle, TransactionHeader.id == RentalLifecycle.transaction_id, isouter=True)
-        )
-
-        # Apply filters
-        conditions = []
-        
-        # Always filter for RENTAL transactions
-        conditions.append(TransactionHeader.transaction_type == TransactionType.RENTAL.value)
-        
-        if active_only:
-            conditions.append(TransactionHeader.is_active == True)
-            
-        if customer_id:
-            conditions.append(TransactionHeader.customer_id == str(customer_id))
-            
-        if location_id:
-            conditions.append(TransactionHeader.location_id == str(location_id))
-            
-        if status:
-            conditions.append(TransactionHeader.status == status.value)
-            
-        if rental_status:
-            conditions.append(TransactionHeader.current_rental_status == rental_status.value)
-            
-        if date_from:
-            conditions.append(
-                TransactionHeader.rental_start_date >= date_from
-            )
-            
-        if date_to:
-            conditions.append(
-                TransactionHeader.rental_end_date <= date_to
-            )
-            
-        if overdue_only:
-            conditions.append(
-                and_(
-                    TransactionHeader.rental_end_date.is_not(None),
-                    TransactionHeader.rental_end_date < func.current_date(),
-                    TransactionHeader.current_rental_status.in_([
-                        RentalStatus.ACTIVE.value,
-                        RentalStatus.LATE.value,
-                        RentalStatus.PARTIAL_RETURN.value,
-                        RentalStatus.LATE_PARTIAL_RETURN.value
-                    ])
-                )
-            )
-
-        if conditions:
-            query = query.where(and_(*conditions))
-
-        # Order by transaction date (newest first)
-        query = query.order_by(desc(TransactionHeader.transaction_date))
-        
-        # Apply pagination
-        query = query.offset(skip).limit(limit)
-
-        result = await self.session.execute(query)
-        return result.unique().scalars().all()
-
-    async def count_rentals_with_lifecycle(
-        self,
-        customer_id: Optional[UUID] = None,
-        location_id: Optional[UUID] = None,
-        status: Optional[TransactionStatus] = None,
-        rental_status: Optional[RentalStatus] = None,
-        date_from: Optional[date] = None,
-        date_to: Optional[date] = None,
-        overdue_only: bool = False,
-        active_only: bool = True,
-    ) -> int:
-        """Count rental transactions with the same filters."""
-        
-        query = (
-            select(func.count(TransactionHeader.id))
-            .join(RentalLifecycle, TransactionHeader.id == RentalLifecycle.transaction_id, isouter=True)
-        )
-
-        # Apply same filters as get_rentals_with_lifecycle
-        conditions = []
-        
-        conditions.append(TransactionHeader.transaction_type == TransactionType.RENTAL.value)
-        
-        if active_only:
-            conditions.append(TransactionHeader.is_active == True)
-            
-        if customer_id:
-            conditions.append(TransactionHeader.customer_id == str(customer_id))
-            
-        if location_id:
-            conditions.append(TransactionHeader.location_id == str(location_id))
-            
-        if status:
-            conditions.append(TransactionHeader.status == status.value)
-            
-        if rental_status:
-            conditions.append(TransactionHeader.current_rental_status == rental_status.value)
-            
-        if date_from:
-            conditions.append(
-                TransactionHeader.rental_start_date >= date_from
-            )
-            
-        if date_to:
-            conditions.append(
-                TransactionHeader.rental_end_date <= date_to
-            )
-            
-        if overdue_only:
-            conditions.append(
-                and_(
-                    TransactionHeader.rental_end_date.is_not(None),
-                    TransactionHeader.rental_end_date < func.current_date(),
-                    TransactionHeader.current_rental_status.in_([
-                        RentalStatus.ACTIVE.value,
-                        RentalStatus.LATE.value,
-                        RentalStatus.PARTIAL_RETURN.value,
-                        RentalStatus.LATE_PARTIAL_RETURN.value
-                    ])
-                )
-            )
-
-        if conditions:
-            query = query.where(and_(*conditions))
-
-        result = await self.session.execute(query)
-        return result.scalar() or 0

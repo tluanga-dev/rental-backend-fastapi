@@ -99,6 +99,24 @@ async def get_item_inventory_detailed(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
+@router.get("/items/rental", response_model=List[ItemListResponse])
+async def get_rental_items(
+    active_only: bool = Query(True),
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get all rental items."""
+    return await service.get_rental_items(active_only=active_only)
+
+
+@router.get("/items/sale", response_model=List[ItemListResponse])
+async def get_sale_items(
+    active_only: bool = Query(True),
+    service: InventoryService = Depends(get_inventory_service)
+):
+    """Get all sale items."""
+    return await service.get_sale_items(active_only=active_only)
+
+
 @router.get("/items/{item_id}", response_model=ItemResponse)
 async def get_item(
     item_id: UUID,
@@ -190,22 +208,7 @@ async def delete_item(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
-@router.get("/items/rental", response_model=List[ItemListResponse])
-async def get_rental_items(
-    active_only: bool = Query(True),
-    service: InventoryService = Depends(get_inventory_service)
-):
-    """Get all rental items."""
-    return await service.get_rental_items(active_only=active_only)
-
-
-@router.get("/items/sale", response_model=List[ItemListResponse])
-async def get_sale_items(
-    active_only: bool = Query(True),
-    service: InventoryService = Depends(get_inventory_service)
-):
-    """Get all sale items."""
-    return await service.get_sale_items(active_only=active_only)
+# Moved to before the {item_id} route to avoid routing conflicts
 
 
 # Inventory Unit endpoints
