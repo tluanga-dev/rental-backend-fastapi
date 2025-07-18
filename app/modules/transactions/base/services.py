@@ -10,9 +10,9 @@ from datetime import datetime, date
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.transaction_base.models import TransactionHeader, TransactionLine, TransactionType, TransactionStatus
-from app.modules.transaction_base.repository import BaseTransactionRepository, BaseTransactionLineRepository
-from app.modules.transaction_base.schemas import (
+from app.modules.transactions.base.models import TransactionHeader, TransactionLine, TransactionType, TransactionStatus
+from app.modules.transactions.base.repository import BaseTransactionRepository, BaseTransactionLineRepository
+from app.modules.transactions.base.schemas import (
     TransactionHeaderCreate,
     TransactionHeaderUpdate,
     TransactionHeaderResponse,

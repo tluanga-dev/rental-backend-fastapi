@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import func, and_, or_, desc, asc
 
 from app.shared.repository import BaseRepository
-from app.modules.transaction_base.models import TransactionHeader, TransactionLine, TransactionType, TransactionStatus
+from app.modules.transactions.base.models import TransactionHeader, TransactionLine, TransactionType, TransactionStatus
 
 
 class BaseTransactionRepository(BaseRepository[TransactionHeader]):

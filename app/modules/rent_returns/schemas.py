@@ -10,7 +10,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, Field, ConfigDict, computed_field
 from uuid import UUID
 
-from app.modules.transaction_base.schemas import (
+from app.modules.transactions.base.schemas import (
     TransactionHeaderCreate,
     TransactionHeaderResponse,
     TransactionLineCreate,

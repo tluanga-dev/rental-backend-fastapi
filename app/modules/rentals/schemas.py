@@ -10,7 +10,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, Field, ConfigDict, computed_field, field_validator
 from uuid import UUID
 
-from app.modules.transaction_base.schemas import (
+from app.modules.transactions.base.schemas import (
     TransactionHeaderCreate,
     TransactionHeaderResponse,
     TransactionLineCreate,
@@ -18,7 +18,7 @@ from app.modules.transaction_base.schemas import (
     TransactionListResponse,
     TransactionHeaderUpdate,
 )
-from app.modules.transaction_base.models import RentalStatus, RentalPeriodUnit
+from app.modules.transactions.base.models import RentalStatus, RentalPeriodUnit
 
 
 class RentalLineCreate(TransactionLineCreate):

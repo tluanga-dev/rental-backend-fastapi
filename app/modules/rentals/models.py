@@ -10,7 +10,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 
 from app.db.base import BaseModel
-from app.modules.transaction_base.models import TransactionHeader, TransactionLine, TransactionType, RentalStatus, RentalPeriodUnit
+from app.modules.transactions.base.models import TransactionHeader, TransactionLine, TransactionType, RentalStatus, RentalPeriodUnit
 
 if TYPE_CHECKING:
     pass

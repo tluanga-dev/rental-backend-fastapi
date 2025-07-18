@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from app.modules.master_data.categories.models import Category
     from app.modules.master_data.units.models import UnitOfMeasurement
     from app.modules.inventory.models import InventoryUnit, StockLevel, StockMovement
-    from app.modules.transaction_base.models import TransactionLine
+    from app.modules.transactions.base.models import TransactionLine
 
 
 

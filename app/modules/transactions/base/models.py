@@ -15,8 +15,10 @@ from uuid import uuid4
 from app.db.base import BaseModel, UUIDType
 
 if TYPE_CHECKING:
-    from app.modules.transactions.models.rental_lifecycle import RentalLifecycle
-    from app.modules.transactions.models.metadata import TransactionMetadata
+    # Temporarily commented out to avoid conflicts with legacy models
+    # from app.modules.transactions.models.rental_lifecycle import RentalLifecycle
+    # from app.modules.transactions.models.metadata import TransactionMetadata
+    pass
 
 
 # Transaction Type Enum
@@ -153,9 +155,11 @@ class TransactionHeader(BaseModel):
     # Relationships
     reference_transaction = relationship("TransactionHeader", remote_side="TransactionHeader.id", lazy="select")
     transaction_lines = relationship("TransactionLine", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
-    metadata_entries = relationship("TransactionMetadata", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
-    rental_lifecycle = relationship("RentalLifecycle", back_populates="transaction", uselist=False, lazy="select")
-    events = relationship("TransactionEvent", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
+    # Temporarily commented out to avoid conflicts with legacy models
+    # metadata_entries = relationship("TransactionMetadata", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
+    # rental_lifecycle = relationship("RentalLifecycle", back_populates="transaction", uselist=False, lazy="select")
+    # Temporarily commented out to avoid conflicts with legacy models
+    # events = relationship("TransactionEvent", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
     
     # Indexes for efficient queries
     __table_args__ = (

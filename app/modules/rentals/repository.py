@@ -13,10 +13,10 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import func, and_, or_, desc, asc
 
-from app.modules.transaction_base.repository import BaseTransactionRepository, BaseTransactionLineRepository
-from app.modules.transaction_base.models import TransactionHeader, TransactionLine, TransactionType, TransactionStatus
+from app.modules.transactions.base.repository import BaseTransactionRepository, BaseTransactionLineRepository
+from app.modules.transactions.base.models import TransactionHeader, TransactionLine, TransactionType, TransactionStatus
 from app.modules.rentals.models import Rental, RentalLine, RentalLifecycle, RentalExtension
-from app.modules.transaction_base.models import RentalStatus
+from app.modules.transactions.base.models import RentalStatus
 
 
 class RentalsRepository(BaseTransactionRepository):

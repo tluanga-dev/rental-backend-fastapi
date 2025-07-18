@@ -10,8 +10,8 @@ from datetime import date, datetime
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.transaction_base.services import BaseTransactionService
-from app.modules.transaction_base.models import TransactionType, TransactionStatus
+from app.modules.transactions.base.services import BaseTransactionService
+from app.modules.transactions.base.models import TransactionType, TransactionStatus
 from app.modules.rent_returns.repository import RentReturnsRepository, RentReturnLineRepository, RentReturnInspectionRepository
 from app.modules.rent_returns.schemas import (
     RentReturnCreate,

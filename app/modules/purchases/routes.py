@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.modules.transaction_base.models import TransactionStatus
+from app.modules.transactions.base.models import TransactionStatus
 from app.modules.purchases.services import PurchasesService
 from app.modules.purchases.schemas import (
     PurchaseCreate,

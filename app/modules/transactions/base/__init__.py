@@ -4,7 +4,7 @@ Transaction Base Module
 This module contains shared models, schemas, and services used by all transaction types.
 """
 
-from app.modules.transaction_base.models import (
+from app.modules.transactions.base.models import (
     TransactionHeader,
     TransactionLine,
     TransactionType,
@@ -16,7 +16,7 @@ from app.modules.transaction_base.models import (
     LineItemType,
 )
 
-from app.modules.transaction_base.schemas import (
+from app.modules.transactions.base.schemas import (
     TransactionHeaderBase,
     TransactionLineBase,
     TransactionHeaderCreate,

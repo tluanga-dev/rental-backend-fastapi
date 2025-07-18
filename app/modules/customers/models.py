@@ -10,7 +10,7 @@ import re
 from app.db.base import BaseModel
 
 if TYPE_CHECKING:
-    from app.modules.transaction_base.models import TransactionHeader
+    from app.modules.transactions.base.models import TransactionHeader
 
 
 class CustomerType(str, Enum):

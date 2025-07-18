@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Column, String, Numeric, Boolean, Text, Date, ForeignKey, Integer
 from sqlalchemy.orm import relationship
 
-from app.modules.transaction_base.models import TransactionHeader, TransactionLine, TransactionType
+from app.modules.transactions.base.models import TransactionHeader, TransactionLine, TransactionType
 
 if TYPE_CHECKING:
     pass

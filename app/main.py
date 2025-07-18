@@ -23,7 +23,7 @@ from app.modules.customers.models import Customer
 from app.modules.inventory.models import InventoryUnit, StockLevel, SKUSequence
 
 # Import new modular transaction models
-from app.modules.transaction_base.models import TransactionHeader, TransactionLine
+from app.modules.transactions.base.models import TransactionHeader, TransactionLine
 from app.modules.sales.models import Sale, SaleLine
 from app.modules.purchases.models import Purchase, PurchaseLine
 from app.modules.rentals.models import Rental, RentalLine, RentalLifecycle, RentalExtension

@@ -10,7 +10,7 @@ from datetime import datetime, date, time
 from pydantic import BaseModel, Field, ConfigDict, field_validator, computed_field
 from uuid import UUID
 
-from app.modules.transaction_base.models import (
+from app.modules.transactions.base.models import (
     TransactionType,
     TransactionStatus,
     PaymentMethod,

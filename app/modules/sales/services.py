@@ -10,8 +10,8 @@ from datetime import date, datetime
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.transaction_base.services import BaseTransactionService
-from app.modules.transaction_base.models import TransactionType, TransactionStatus
+from app.modules.transactions.base.services import BaseTransactionService
+from app.modules.transactions.base.models import TransactionType, TransactionStatus
 from app.modules.sales.repository import SalesRepository, SaleLineRepository
 from app.modules.sales.schemas import (
     SaleCreate,
