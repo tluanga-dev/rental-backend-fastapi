@@ -6,6 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import selectinload
 
+# Import caching utilities
+from app.core.cache import cached, RentalCache, cache
+
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 from app.modules.transactions.models import (
     TransactionHeader,
@@ -60,7 +63,7 @@ from app.modules.customers.repository import CustomerRepository
 from app.modules.inventory.repository import ItemRepository, InventoryUnitRepository
 from app.modules.inventory.service import InventoryService
 from app.modules.inventory.models import StockLevel, StockMovement
-from app.modules.inventory.enums import MovementType, ReferenceType
+from app.modules.inventory.models import MovementType, ReferenceType
 from app.core.logger import get_purchase_logger
 from app.modules.system.services.audit_service import AuditService
 
@@ -206,6 +209,12 @@ class TransactionService:
                 )
 
             # Transaction committed automatically by async with
+            
+            # Invalidate stock cache after updates
+            await RentalCache.invalidate_stock_cache(
+                [item.item_id for item in rental_data.items], 
+                str(rental_data.location_id)
+            )
 
             self.logger.log_debug_info("Optimized rental creation completed", {
                 "transaction_id": str(transaction.id),
@@ -233,20 +242,9 @@ class TransactionService:
             raise e
 
     async def _batch_validate_rental_items(self, item_ids: List[UUID]) -> Dict[UUID, Any]:
-        """Batch validate all rental items in a single query."""
-        from app.modules.master_data.item_master.models import Item
-        from sqlalchemy import select
-        
-        query = select(Item).where(
-            and_(
-                Item.id.in_([str(id) for id in item_ids]),
-                Item.is_rentable == True,
-                Item.is_active == True
-            )
-        )
-        
-        result = await self.session.execute(query)
-        items = result.scalars().all()
+        """Batch validate all rental items with caching."""
+        # Use cached lookup for rentable items
+        items = await RentalCache.get_rentable_items(self.session, item_ids)
         
         # Validate all items exist and are rentable
         found_items = {UUID(item.id): item for item in items}
@@ -259,20 +257,9 @@ class TransactionService:
         return found_items
 
     async def _batch_get_stock_levels_for_rental(self, item_ids: List[UUID], location_id: UUID) -> Dict[UUID, Any]:
-        """Get stock levels for all items in a single query for rental operations."""
-        from sqlalchemy import select, and_
-        from app.modules.inventory.models import StockLevel
-        
-        query = select(StockLevel).where(
-            and_(
-                StockLevel.item_id.in_([str(id) for id in item_ids]),
-                StockLevel.location_id == str(location_id),
-                StockLevel.is_active == True
-            )
-        )
-        
-        result = await self.session.execute(query)
-        stock_levels = result.scalars().all()
+        """Get stock levels with caching for rental operations."""
+        # Use cached lookup for stock levels
+        stock_levels = await RentalCache.get_stock_levels(self.session, item_ids, str(location_id))
         
         return {UUID(sl.item_id): sl for sl in stock_levels}
 
@@ -300,18 +287,27 @@ class TransactionService:
         stock_levels: Dict[UUID, Any], 
         transaction_id: UUID
     ):
-        """Process all rental stock operations in a single batch."""
-        from app.modules.inventory.models import StockMovement
+        """
+        Process all rental stock operations using bulk operations.
+        Optimized version with bulk UPDATE instead of individual updates.
+        """
+        from app.modules.inventory.models import StockMovement, StockLevel
+        from sqlalchemy import update, bindparam
         
+        # Prepare bulk update data and stock movements
+        stock_updates = []
         stock_movements = []
         
         for item in items:
             stock_level = stock_levels[item.item_id]
             quantity_change = Decimal(str(item.quantity))
             
-            # Update stock level quantities
-            stock_level.available_quantity -= quantity_change
-            stock_level.on_rent_quantity += quantity_change
+            # Prepare update data for bulk operation
+            stock_updates.append({
+                'id': str(stock_level.id),
+                'available_quantity': stock_level.available_quantity - quantity_change,
+                'on_rent_quantity': stock_level.on_rent_quantity + quantity_change
+            })
             
             # Create stock movement record
             movement = StockMovement(
@@ -322,34 +318,77 @@ class TransactionService:
                 reference_type=ReferenceType.TRANSACTION.value,
                 reference_id=str(transaction_id),
                 quantity_change=-quantity_change,
-                quantity_before=stock_level.available_quantity + quantity_change,
-                quantity_after=stock_level.available_quantity,
+                quantity_before=stock_level.available_quantity,
+                quantity_after=stock_level.available_quantity - quantity_change,
                 reason=f"Rental transaction {transaction_id}",
                 notes=f"Rental out - {item.quantity} units"
             )
             stock_movements.append(movement)
+        
+        # Execute bulk stock level update
+        if stock_updates:
+            stmt = (
+                update(StockLevel)
+                .where(StockLevel.id == bindparam('id'))
+                .values(
+                    available_quantity=bindparam('available_quantity'),
+                    on_rent_quantity=bindparam('on_rent_quantity'),
+                    updated_at=func.now()
+                )
+            )
+            await self.session.execute(stmt, stock_updates)
         
         # Bulk add all stock movements
         if stock_movements:
             self.session.add_all(stock_movements)
 
     async def _generate_rental_transaction_number(self, rental_data: NewRentalRequest) -> str:
-        """Generate unique rental transaction number efficiently."""
-        import random
+        """
+        Generate unique rental transaction number efficiently.
+        Optimized to avoid potential infinite loops and reduce database queries.
+        """
+        import time
         
         if rental_data.reference_number:
-            transaction_number = rental_data.reference_number
-            if await self.transaction_repository.get_by_number(transaction_number):
-                raise ConflictError(f"Reference number '{transaction_number}' already exists")
+            # Quick existence check for custom reference number
+            exists = await self.session.execute(
+                select(1).where(
+                    TransactionHeader.transaction_number == rental_data.reference_number
+                ).limit(1)
+            )
+            if exists.scalar():
+                raise ConflictError(f"Reference number '{rental_data.reference_number}' already exists")
+            return rental_data.reference_number
+        
+        # Use timestamp-based generation for better uniqueness
+        timestamp = int(time.time() * 1000)  # Millisecond precision
+        date_str = rental_data.transaction_date.strftime('%Y%m%d')
+        
+        # Try timestamp-based number first (very unlikely to collide)
+        transaction_number = f"REN-{date_str}-{timestamp % 1000000}"
+        
+        # Quick check if it exists
+        exists = await self.session.execute(
+            select(1).where(
+                TransactionHeader.transaction_number == transaction_number
+            ).limit(1)
+        )
+        
+        if not exists.scalar():
             return transaction_number
         
-        # Generate unique transaction number
-        transaction_number = f"REN-{rental_data.transaction_date.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+        # Fallback: Add counter suffix if collision occurs
+        for i in range(1, 100):
+            transaction_number = f"REN-{date_str}-{timestamp % 1000000}-{i}"
+            exists = await self.session.execute(
+                select(1).where(
+                    TransactionHeader.transaction_number == transaction_number
+                ).limit(1)
+            )
+            if not exists.scalar():
+                return transaction_number
         
-        # Check uniqueness with single query
-        while await self.transaction_repository.get_by_number(transaction_number):
-            transaction_number = f"REN-{rental_data.transaction_date.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
-        
-        return transaction_number
+        # If still no unique number, raise error (should never happen)
+        raise ConflictError("Unable to generate unique transaction number")
 
     # ... [keeping existing methods] ...

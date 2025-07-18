@@ -194,7 +194,7 @@ async def create_new_rental_optimized(
     Same input format as /new-rental but with dramatically improved performance.
     """
     try:
-        return await service.create_new_rental_minimal_test(rental_data)
+        return await service.create_new_rental_optimized(rental_data)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValidationError as e:

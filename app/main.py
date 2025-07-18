@@ -46,6 +46,9 @@ from app.core.logging_middleware import TransactionLoggingMiddleware, RequestCon
 # Import task scheduler
 from app.core.scheduler import task_scheduler
 
+# Import performance monitoring
+from app.modules.monitoring.performance_monitor import monitoring_router, PerformanceTrackingMiddleware
+
 # Initialize centralized logging
 setup_application_logging()
 logger = get_application_logger(__name__)
@@ -114,6 +117,9 @@ app.add_middleware(EndpointAccessMiddleware, enabled=settings.USE_WHITELIST_CONF
 app.add_middleware(TransactionLoggingMiddleware)
 app.add_middleware(RequestContextMiddleware)
 
+# Add performance tracking middleware
+app.add_middleware(PerformanceTrackingMiddleware)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -142,6 +148,20 @@ async def custom_http_exception_handler(request: Request, exc: CustomHTTPExcepti
 async def health_check():
     return {"status": "healthy", "service": settings.PROJECT_NAME}
 
+# Detailed health check with pool status
+@app.get("/health/detailed")
+async def health_check_detailed():
+    from app.core.database import get_pool_status
+    from datetime import datetime
+    
+    pool_status = await get_pool_status()
+    return {
+        "status": "healthy",
+        "service": settings.PROJECT_NAME,
+        "database_pool": pool_status,
+        "timestamp": datetime.now().isoformat()
+    }
+
 # Include routers
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(users_router, prefix="/api/users", tags=["Users"])
@@ -153,6 +173,7 @@ app.include_router(transactions_router, prefix="/api/transactions", tags=["Trans
 app.include_router(returns_router, prefix="/api/transactions", tags=["Returns"])
 app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(system_router, prefix="/api/system", tags=["System"])
+app.include_router(monitoring_router)  # Performance monitoring endpoints
 
 # API v1 routes (for backward compatibility)
 app.include_router(suppliers_router, prefix="/api/v1/suppliers", tags=["Suppliers V1"])
@@ -169,6 +190,27 @@ async def startup():
         await conn.run_sync(Base.metadata.create_all)
         
     logger.info("Database tables created/verified")
+    
+    # Initialize Redis cache
+    try:
+        from app.core.cache import cache, CacheWarmer
+        await cache.initialize()
+        logger.info("Redis cache initialized")
+        
+        # Warm cache with frequently accessed data
+        from app.shared.dependencies import get_session
+        async for session in get_session():
+            try:
+                warmer = CacheWarmer()
+                await warmer.warm_item_cache(session)
+                await warmer.warm_location_cache(session)
+                logger.info("Cache warmed with frequently accessed data")
+                break
+            except Exception as e:
+                logger.warning(f"Cache warming failed: {str(e)}")
+                break
+    except Exception as e:
+        logger.warning(f"Redis initialization failed: {str(e)} - Cache disabled")
     
     # Initialize system settings
     try:
@@ -214,6 +256,14 @@ async def shutdown():
         logger.info("Task scheduler stopped successfully")
     except Exception as e:
         logger.error(f"Error stopping task scheduler: {str(e)}")
+    
+    # Close Redis cache
+    try:
+        from app.core.cache import cache
+        await cache.close()
+        logger.info("Redis cache closed")
+    except Exception as e:
+        logger.warning(f"Error closing Redis cache: {str(e)}")
     
     logger.info("Shutdown complete")
 
