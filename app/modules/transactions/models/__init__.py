@@ -18,20 +18,6 @@ from .transaction_lines import (
     LineItemType,
 )
 
-
-# Import additional models
-from .metadata import TransactionMetadata
-from .inspections import RentalInspection, PurchaseCreditMemo
-from .rental_lifecycle import (
-    RentalLifecycle, 
-    RentalReturnEvent, 
-    RentalItemInspection,
-    RentalStatusLog,
-    ReturnEventType,
-    InspectionCondition,
-    RentalStatusChangeReason
-)
-
 # Export all models for backward compatibility
 __all__ = [
     # Core enums
@@ -46,18 +32,4 @@ __all__ = [
     # Core models
     "TransactionHeader",
     "TransactionLine",
-    
-    # Additional models
-    "TransactionMetadata",
-    "RentalInspection",
-    "PurchaseCreditMemo",
-    
-    # Rental lifecycle models
-    "RentalLifecycle",
-    "RentalReturnEvent", 
-    "RentalItemInspection",
-    "RentalStatusLog",
-    "ReturnEventType",
-    "InspectionCondition",
-    "RentalStatusChangeReason"
 ]

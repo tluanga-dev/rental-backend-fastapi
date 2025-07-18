@@ -13,17 +13,19 @@ from uuid import uuid4
 from app.db.base import BaseModel, UUIDType
 
 if TYPE_CHECKING:
-    from app.modules.transactions.models.lines import TransactionLine
-    from app.modules.transactions.models.rental_lifecycle import RentalLifecycle
-    from app.modules.transactions.models.metadata import TransactionMetadata
+    from app.modules.transactions.models.transaction_lines import TransactionLine
+    # from app.modules.transactions.models.rental_lifecycle import RentalLifecycle
+    # from app.modules.transactions.models.metadata import TransactionMetadata
 
 
 # Transaction Type Enum
 class TransactionType(PyEnum):
     SALE = "SALE"
+    SALE_RETURN = "SALE_RETURN"
     PURCHASE = "PURCHASE"
+    PURCHASE_RETURN = "PURCHASE_RETURN"
     RENTAL = "RENTAL"
-    RETURN = "RETURN"
+    RENTAL_RETURN = "RENTAL_RETURN"
     ADJUSTMENT = "ADJUSTMENT"
 
 
@@ -145,9 +147,9 @@ class TransactionHeader(BaseModel):
     # sales_person = relationship("User", back_populates="transactions", lazy="select")  # Temporarily disabled
     reference_transaction = relationship("TransactionHeader", remote_side="TransactionHeader.id", lazy="select")
     transaction_lines = relationship("TransactionLine", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
-    metadata_entries = relationship("TransactionMetadata", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
-    rental_lifecycle = relationship("RentalLifecycle", back_populates="transaction", uselist=False, lazy="select")
-    events = relationship("TransactionEvent", back_populates="transaction", lazy="select", cascade="all, delete-orphan")
+    # metadata_entries = relationship("TransactionMetadata", back_populates="transaction", lazy="select", cascade="all, delete-orphan")  # Temporarily disabled
+    # rental_lifecycle = relationship("RentalLifecycle", back_populates="transaction", uselist=False, lazy="select")  # Temporarily disabled
+    # events = relationship("TransactionEvent", back_populates="transaction", lazy="select", cascade="all, delete-orphan")  # Temporarily disabled
     
     # Indexes for efficient queries
     __table_args__ = (

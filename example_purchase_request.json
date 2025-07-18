@@ -1,0 +1,27 @@
+{
+  "supplier_id": "123e4567-e89b-12d3-a456-426614174000",
+  "location_id": "456e7890-e89b-12d3-a456-426614174001",
+  "purchase_date": "2024-01-15",
+  "notes": "Q1 2024 inventory replenishment - urgent order",
+  "reference_number": "PO-2024-Q1-001",
+  "items": [
+    {
+      "item_id": "789e0123-e89b-12d3-a456-426614174002",
+      "quantity": 50,
+      "unit_cost": 25.50,
+      "tax_rate": 8.5,
+      "discount_amount": 50.00,
+      "condition": "A",
+      "notes": "Brand new items - priority stock"
+    },
+    {
+      "item_id": "012e3456-e89b-12d3-a456-426614174003",
+      "quantity": 30,
+      "unit_cost": 15.75,
+      "tax_rate": 8.5,
+      "discount_amount": 0,
+      "condition": "B",
+      "notes": "Slightly used but good quality"
+    }
+  ]
+}

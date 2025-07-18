@@ -22,7 +22,7 @@ from app.modules.analytics.schemas import (
     SystemHealthSummary, AlertAcknowledgeRequest, AlertResolveRequest,
     MetricValueUpdate, ReportGenerationRequest
 )
-from app.modules.transactions.repository import TransactionHeaderRepository
+from app.modules.transactions.repository import TransactionRepository
 from app.modules.customers.repository import CustomerRepository
 from app.modules.inventory.repository import ItemRepository, InventoryUnitRepository
 
@@ -36,7 +36,7 @@ class AnalyticsService:
         self.metric_repository = BusinessMetricRepository(session)
         self.alert_repository = SystemAlertRepository(session)
         # Import other repositories for analytics
-        self.transaction_repository = TransactionHeaderRepository(session)
+        self.transaction_repository = TransactionRepository(session)
         self.customer_repository = CustomerRepository(session)
         self.item_repository = ItemRepository(session)
         self.inventory_unit_repository = InventoryUnitRepository(session)

@@ -106,12 +106,7 @@ async def get_inventory_service(
     return InventoryService(session)
 
 
-async def get_transaction_service(
-    session: AsyncSessionDep
-):
-    """Get transaction service instance."""
-    from app.modules.transactions.service import TransactionService
-    return TransactionService(session)
+# Transaction service removed - use specific transaction services (e.g., PurchaseService) instead
 
 
 async def get_location_service(
@@ -194,10 +189,7 @@ async def get_inventory_repository(session: AsyncSessionDep):
     return InventoryRepository(session)
 
 
-async def get_transaction_repository(session: AsyncSessionDep):
-    """Get transaction repository instance."""
-    from app.modules.transactions.repository import TransactionRepository
-    return TransactionRepository(session)
+# Transaction repository removed - use specific transaction repositories as needed
 
 
 async def get_location_repository(session: AsyncSessionDep):
@@ -252,7 +244,6 @@ __all__ = [
     "get_customer_service",
     "get_supplier_service",
     "get_inventory_service",
-    "get_transaction_service",
     "get_rental_service",
     "get_analytics_service",
     "get_system_service",

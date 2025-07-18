@@ -1,20 +1,33 @@
 # Transactions module
 
-from app.modules.transactions.models import (
+from app.modules.transactions.models.transaction_headers import (
     TransactionHeader,
-    TransactionLine,
     TransactionType,
     TransactionStatus,
     PaymentMethod,
     PaymentStatus,
     RentalPeriodUnit,
+)
+from app.modules.transactions.models.transaction_lines import (
+    TransactionLine,
     LineItemType,
-    TransactionMetadata,
-    RentalInspection,
-    PurchaseCreditMemo,
+)
+from app.modules.transactions.repository import TransactionRepository, TransactionLineRepository
+from app.modules.transactions.routes import router as transaction_router
+
+# Import purchase module
+from app.modules.transactions.purchase import (
+    NewPurchaseRequest,
+    PurchaseItemCreate,
+    PurchaseTransactionResponse,
+    ItemCondition,
+    PurchaseService,
+    get_purchase_service,
+    purchase_router
 )
 
 __all__ = [
+    # Core transaction models
     "TransactionHeader",
     "TransactionLine",
     "TransactionType",
@@ -23,7 +36,17 @@ __all__ = [
     "PaymentStatus",
     "RentalPeriodUnit",
     "LineItemType",
-    "TransactionMetadata",
-    "RentalInspection",
-    "PurchaseCreditMemo",
+    # Core transaction repositories
+    "TransactionRepository",
+    "TransactionLineRepository",
+    # Purchase module
+    "NewPurchaseRequest",
+    "PurchaseItemCreate",
+    "PurchaseTransactionResponse",
+    "ItemCondition",
+    "PurchaseService",
+    "get_purchase_service",
+    # Routers
+    "transaction_router",
+    "purchase_router",
 ]
