@@ -106,14 +106,6 @@ async def get_inventory_service(
     return InventoryService(session)
 
 
-async def get_transaction_service(
-    session: AsyncSessionDep
-):
-    """Get transaction service instance."""
-    from app.modules.transactions.service import TransactionService
-    return TransactionService(session)
-
-
 async def get_location_service(
     session: AsyncSessionDep
 ):
@@ -252,8 +244,6 @@ __all__ = [
     "get_customer_service",
     "get_supplier_service",
     "get_inventory_service",
-    "get_transaction_service",
-    "get_rental_service",
     "get_analytics_service",
     "get_system_service",
     "get_brand_service",

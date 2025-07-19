@@ -16,7 +16,7 @@ from app.modules.transactions.service import TransactionService
 from app.modules.transactions.schemas import NewPurchaseRequest, PurchaseItemCreate
 from app.modules.inventory.schemas import StockLevelCreate, StockLevelResponse
 from app.modules.inventory.models import StockLevel
-from app.modules.transactions.models import TransactionHeader, TransactionType, TransactionStatus, PaymentStatus
+from app.modules.transactions.base.models import TransactionHeader, TransactionType, TransactionStatus, PaymentStatus
 from app.core.errors import NotFoundError, ConflictError
 
 

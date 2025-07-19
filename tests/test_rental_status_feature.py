@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.transactions.services.rental_status_calculator import RentalStatusCalculator, LineItemStatus
 from app.modules.transactions.services.rental_status_updater import RentalStatusUpdater
 from app.modules.transactions.services.rental_service import RentalReturnService
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionHeader,
     TransactionLine,
     TransactionType,

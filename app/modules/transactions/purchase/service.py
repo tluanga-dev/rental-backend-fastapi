@@ -1,28 +1,37 @@
 """
-Purchase transaction service for business logic.
+Purchase Service
+
+Business logic for purchase transaction operations.
 """
 
-from datetime import datetime, date
-from decimal import Decimal
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-
+from datetime import datetime, date
+from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy import select, and_, or_, func
 
-from app.core.errors import NotFoundError
-from app.modules.transactions.models.transaction_headers import TransactionHeader, TransactionType
-from app.modules.transactions.models.transaction_lines import TransactionLine
-from app.modules.transactions.purchase.schemas import (
-    PurchaseTransactionFilterRequest,
-    PurchaseTransactionSummary,
-    PurchaseTransactionDataResponse,
-    PaginationParams
+from app.core.errors import NotFoundError, ValidationError
+from app.modules.transactions.base.models import (
+    TransactionHeader, 
+    TransactionType, 
+    TransactionLine,
+    TransactionStatus,
+    PaymentStatus
 )
-from app.modules.transactions.repository import TransactionRepository, TransactionLineRepository
+from app.modules.transactions.purchase.schemas import (
+    PurchaseResponse,
+    PurchaseDetail,
+    NewPurchaseRequest,
+    NewPurchaseResponse
+)
+from app.modules.transactions.base.repository import TransactionHeaderRepository, TransactionLineRepository
 from app.modules.suppliers.repository import SupplierRepository
 from app.modules.master_data.locations.repository import LocationRepository
-from app.modules.master_data.item_master.repository import ItemRepository
+from app.modules.master_data.item_master.repository import ItemMasterRepository
+from app.modules.inventory.repository import StockLevelRepository, StockMovementRepository
+from app.modules.inventory.models import MovementType, ReferenceType
 
 
 class PurchaseService:
@@ -30,249 +39,395 @@ class PurchaseService:
     
     def __init__(self, session: AsyncSession):
         self.session = session
-        self.transaction_repository = TransactionRepository(session)
+        self.transaction_repository = TransactionHeaderRepository(session)
         self.transaction_line_repository = TransactionLineRepository(session)
         self.supplier_repository = SupplierRepository(session)
         self.location_repository = LocationRepository(session)
-        self.item_repository = ItemRepository(session)
+        self.item_repository = ItemMasterRepository(session)
+        self.stock_level_repository = StockLevelRepository(session)
+        self.stock_movement_repository = StockMovementRepository(session)
     
-    async def list_purchase_transactions(
+    async def get_purchase_transactions(
         self,
-        filters: PurchaseTransactionFilterRequest,
-        pagination: PaginationParams
-    ) -> Dict[str, Any]:
+        skip: int = 0,
+        limit: int = 100,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        amount_from: Optional[Decimal] = None,
+        amount_to: Optional[Decimal] = None,
+        supplier_id: Optional[UUID] = None,
+        status: Optional[TransactionStatus] = None,
+        payment_status: Optional[PaymentStatus] = None,
+    ) -> List[PurchaseResponse]:
         """
-        List purchase transactions with filtering and pagination.
-        
-        Args:
-            filters: Filter criteria
-            pagination: Pagination parameters
-            
-        Returns:
-            Dictionary containing transactions and pagination info
+        Get purchase transactions with filtering options.
         """
-        # Build filters dictionary
-        filter_dict = {}
-        if filters.start_date:
-            filter_dict["start_date"] = datetime.combine(filters.start_date, datetime.min.time())
-        if filters.end_date:
-            filter_dict["end_date"] = datetime.combine(filters.end_date, datetime.max.time())
-        if filters.supplier_id:
-            filter_dict["supplier_id"] = filters.supplier_id
-        if filters.location_id:
-            filter_dict["location_id"] = filters.location_id
-        if filters.status:
-            filter_dict["status"] = filters.status
-        if filters.payment_status:
-            filter_dict["payment_status"] = filters.payment_status
-        if filters.transaction_number:
-            filter_dict["transaction_number"] = filters.transaction_number
-        if filters.min_amount:
-            filter_dict["min_amount"] = filters.min_amount
-        if filters.max_amount:
-            filter_dict["max_amount"] = filters.max_amount
-        if filters.item_ids:
-            filter_dict["item_ids"] = filters.item_ids
-        
-        # Get total count
-        total_count = await self.transaction_repository.count_purchase_transactions(filter_dict)
-        
-        # Get transactions
-        transactions = await self.transaction_repository.get_purchase_transactions_with_filters(
-            filters=filter_dict,
-            skip=pagination.skip,
-            limit=pagination.limit,
-            sort_by=pagination.sort_by or "transaction_date",
-            sort_order=pagination.sort_order or "desc"
+        # Build query
+        query = select(TransactionHeader).where(
+            TransactionHeader.transaction_type == TransactionType.PURCHASE
         )
         
-        # Build response with enriched data
-        transaction_summaries = []
+        # Apply filters
+        if date_from:
+            query = query.where(TransactionHeader.transaction_date >= date_from)
+        if date_to:
+            query = query.where(TransactionHeader.transaction_date <= date_to)
+        if amount_from:
+            query = query.where(TransactionHeader.total_amount >= amount_from)
+        if amount_to:
+            query = query.where(TransactionHeader.total_amount <= amount_to)
+        if supplier_id:
+            query = query.where(TransactionHeader.customer_id == str(supplier_id))
+        if status:
+            query = query.where(TransactionHeader.status == status)
+        if payment_status:
+            query = query.where(TransactionHeader.payment_status == payment_status)
+            
+        # Add ordering and pagination
+        query = query.order_by(TransactionHeader.transaction_date.desc())
+        query = query.offset(skip).limit(limit)
+        
+        # Execute query with eager loading
+        query = query.options(selectinload(TransactionHeader.transaction_lines))
+        result = await self.session.execute(query)
+        transactions = result.scalars().all()
+        
+        # Transform to purchase response format
+        purchase_responses = []
         for transaction in transactions:
-            # Get supplier name
-            supplier_name = None
+            # Get supplier details
+            supplier = None
             if transaction.customer_id:
                 supplier = await self.supplier_repository.get_by_id(UUID(transaction.customer_id))
-                supplier_name = supplier.company_name if supplier else None
             
-            # Get location name
-            location_name = None
+            # Get location details
+            location = None
             if transaction.location_id:
                 location = await self.location_repository.get_by_id(UUID(transaction.location_id))
-                location_name = location.name if location else None
+                
+            # Get item details for each line
+            items_details = {}
+            for line in transaction.transaction_lines:
+                if line.item_id:
+                    item = await self.item_repository.get_by_id(UUID(line.item_id))
+                    if item:
+                        items_details[str(line.item_id)] = {
+                            "id": item.id,
+                            "name": item.item_name
+                        }
             
-            summary = PurchaseTransactionSummary(
-                id=transaction.id,
-                transaction_number=transaction.transaction_number,
-                transaction_date=transaction.transaction_date,
-                supplier_name=supplier_name,
-                location_name=location_name,
-                status=transaction.status.value,
-                payment_status=transaction.payment_status.value,
-                total_amount=transaction.total_amount,
-                item_count=len(transaction.transaction_lines),
-                created_at=transaction.created_at
-            )
-            transaction_summaries.append(summary)
-        
-        # Calculate pagination metadata
-        total_pages = (total_count + pagination.limit - 1) // pagination.limit if pagination.limit > 0 else 1
-        current_page = (pagination.skip // pagination.limit) + 1 if pagination.limit > 0 else 1
-        
-        return {
-            "data": transaction_summaries,
-            "pagination": {
-                "total": total_count,
-                "skip": pagination.skip,
-                "limit": pagination.limit,
-                "current_page": current_page,
-                "total_pages": total_pages,
-                "has_next": current_page < total_pages,
-                "has_prev": current_page > 1
+            # Convert transaction to dict with proper line serialization
+            transaction_dict = {
+                "id": transaction.id,
+                "transaction_number": transaction.transaction_number,
+                "transaction_type": transaction.transaction_type,
+                "transaction_date": transaction.transaction_date,
+                "customer_id": transaction.customer_id,
+                "location_id": transaction.location_id,
+                "status": transaction.status,
+                "payment_status": transaction.payment_status,
+                "subtotal": transaction.subtotal,
+                "tax_amount": transaction.tax_amount,
+                "discount_amount": transaction.discount_amount,
+                "total_amount": transaction.total_amount,
+                "notes": transaction.notes,
+                "created_at": transaction.created_at,
+                "updated_at": transaction.updated_at,
+                "transaction_lines": [
+                    {
+                        "id": line.id,
+                        "item_id": line.item_id,
+                        "quantity": line.quantity,
+                        "unit_price": line.unit_price,
+                        "tax_rate": line.tax_rate,
+                        "tax_amount": line.tax_amount,
+                        "discount_amount": line.discount_amount,
+                        "line_total": line.line_total,
+                        "description": line.description,
+                        "notes": line.notes,
+                        "created_at": line.created_at,
+                        "updated_at": line.updated_at,
+                    }
+                    for line in transaction.transaction_lines
+                ]
             }
-        }
+            
+            purchase_response = PurchaseResponse.from_transaction(
+                transaction_dict,
+                supplier_details={"id": supplier.id, "name": supplier.company_name} if supplier else None,
+                location_details={"id": location.id, "name": location.location_name} if location else None,
+                items_details=items_details
+            )
+            purchase_responses.append(purchase_response)
+            
+        return purchase_responses
     
-    async def get_purchase_transaction_by_id(self, transaction_id: UUID) -> PurchaseTransactionDataResponse:
-        """
-        Get detailed purchase transaction by ID.
+    async def get_purchase_by_id(self, purchase_id: UUID) -> PurchaseResponse:
+        """Get a single purchase transaction by ID."""
+        transaction = await self.transaction_repository.get_by_id(purchase_id)
         
-        Args:
-            transaction_id: Transaction UUID
-            
-        Returns:
-            Detailed transaction data
-            
-        Raises:
-            NotFoundError: If transaction not found
-        """
-        transaction = await self.transaction_repository.get_purchase_transaction_details(transaction_id)
         if not transaction:
-            raise NotFoundError(f"Purchase transaction with ID {transaction_id} not found")
+            raise NotFoundError(f"Purchase transaction {purchase_id} not found")
+            
+        if transaction.transaction_type != TransactionType.PURCHASE:
+            raise ValidationError(f"Transaction {purchase_id} is not a purchase transaction")
         
-        # Build response
-        return PurchaseTransactionDataResponse(
-            id=transaction.id,
-            transaction_number=transaction.transaction_number,
-            transaction_type=transaction.transaction_type.value,
-            transaction_date=transaction.transaction_date.isoformat(),
-            customer_id=UUID(transaction.customer_id) if transaction.customer_id else None,
-            location_id=UUID(transaction.location_id) if transaction.location_id else None,
-            status=transaction.status.value,
-            payment_status=transaction.payment_status.value,
-            subtotal=transaction.subtotal,
-            discount_amount=transaction.discount_amount,
-            tax_amount=transaction.tax_amount,
-            total_amount=transaction.total_amount,
-            paid_amount=transaction.paid_amount,
-            notes=transaction.notes,
-            created_at=transaction.created_at.isoformat(),
-            updated_at=transaction.updated_at.isoformat(),
-            transaction_lines=[
-                PurchaseTransactionLineResponse(
-                    id=line.id,
-                    line_number=line.line_number,
-                    item_id=UUID(line.item_id) if line.item_id else None,
-                    description=line.description,
-                    quantity=line.quantity,
-                    unit_price=line.unit_price,
-                    tax_rate=line.tax_rate,
-                    tax_amount=line.tax_amount,
-                    discount_amount=line.discount_amount,
-                    line_total=line.line_total,
-                    notes=line.notes,
-                    created_at=line.created_at.isoformat(),
-                    updated_at=line.updated_at.isoformat()
-                )
+        # Get supplier details
+        supplier = None
+        if transaction.customer_id:
+            supplier = await self.supplier_repository.get_by_id(UUID(transaction.customer_id))
+        
+        # Get location details
+        location = None
+        if transaction.location_id:
+            location = await self.location_repository.get_by_id(UUID(transaction.location_id))
+            
+        # Get item details for each line
+        items_details = {}
+        for line in transaction.transaction_lines:
+            if line.item_id:
+                item = await self.item_repository.get_by_id(UUID(line.item_id))
+                if item:
+                    items_details[str(line.item_id)] = {
+                        "id": item.id,
+                        "name": item.item_name
+                    }
+        
+        # Convert transaction to dict with proper line serialization
+        transaction_dict = {
+            "id": transaction.id,
+            "transaction_number": transaction.transaction_number,
+            "transaction_type": transaction.transaction_type,
+            "transaction_date": transaction.transaction_date,
+            "customer_id": transaction.customer_id,
+            "location_id": transaction.location_id,
+            "status": transaction.status,
+            "payment_status": transaction.payment_status,
+            "subtotal": transaction.subtotal,
+            "tax_amount": transaction.tax_amount,
+            "discount_amount": transaction.discount_amount,
+            "total_amount": transaction.total_amount,
+            "notes": transaction.notes,
+            "created_at": transaction.created_at,
+            "updated_at": transaction.updated_at,
+            "transaction_lines": [
+                {
+                    "id": line.id,
+                    "item_id": line.item_id,
+                    "quantity": line.quantity,
+                    "unit_price": line.unit_price,
+                    "tax_rate": line.tax_rate,
+                    "tax_amount": line.tax_amount,
+                    "discount_amount": line.discount_amount,
+                    "line_total": line.line_total,
+                    "description": line.description,
+                    "notes": line.notes,
+                    "created_at": line.created_at,
+                    "updated_at": line.updated_at,
+                }
                 for line in transaction.transaction_lines
             ]
+        }
+        
+        return PurchaseResponse.from_transaction(
+            transaction_dict,
+            supplier_details={"id": supplier.id, "name": supplier.company_name} if supplier else None,
+            location_details={"id": location.id, "name": location.location_name} if location else None,
+            items_details=items_details
         )
     
-    async def get_purchase_transactions_by_supplier(
-        self,
-        supplier_id: UUID,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[PurchaseTransactionSummary]:
-        """Get purchase transactions for a specific supplier."""
+    async def create_new_purchase(self, purchase_data: NewPurchaseRequest) -> NewPurchaseResponse:
+        """Create a new purchase transaction."""
         # Validate supplier exists
-        supplier = await self.supplier_repository.get_by_id(supplier_id)
+        supplier = await self.supplier_repository.get_by_id(purchase_data.supplier_id)
         if not supplier:
-            raise NotFoundError(f"Supplier with ID {supplier_id} not found")
+            raise NotFoundError(f"Supplier with ID {purchase_data.supplier_id} not found")
         
-        transactions = await self.transaction_repository.get_purchase_transactions_by_supplier(
-            supplier_id=supplier_id,
-            skip=skip,
-            limit=limit
-        )
+        # Validate location exists
+        location = await self.location_repository.get_by_id(purchase_data.location_id)
+        if not location:
+            raise NotFoundError(f"Location with ID {purchase_data.location_id} not found")
         
-        # Build summaries
-        summaries = []
-        for transaction in transactions:
-            location_name = None
-            if transaction.location_id:
-                location = await self.location_repository.get_by_id(UUID(transaction.location_id))
-                location_name = location.name if location else None
-            
-            summary = PurchaseTransactionSummary(
-                id=transaction.id,
-                transaction_number=transaction.transaction_number,
-                transaction_date=transaction.transaction_date,
-                supplier_name=supplier.company_name,
-                location_name=location_name,
-                status=transaction.status.value,
-                payment_status=transaction.payment_status.value,
-                total_amount=transaction.total_amount,
-                item_count=len(transaction.transaction_lines),
-                created_at=transaction.created_at
-            )
-            summaries.append(summary)
-        
-        return summaries
-    
-    async def get_purchase_transactions_by_items(
-        self,
-        item_ids: List[UUID],
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[PurchaseTransactionSummary]:
-        """Get purchase transactions containing specific items."""
-        # Validate items exist
-        for item_id in item_ids:
-            item = await self.item_repository.get_by_id(item_id)
+        # Validate all items exist
+        for item_data in purchase_data.items:
+            item = await self.item_repository.get_by_id(UUID(item_data.item_id))
             if not item:
-                raise NotFoundError(f"Item with ID {item_id} not found")
+                raise NotFoundError(f"Item with ID {item_data.item_id} not found")
         
-        transactions = await self.transaction_repository.get_purchase_transactions_by_items(
-            item_ids=item_ids,
-            skip=skip,
-            limit=limit
+        # Generate transaction number
+        transaction_number = await self._generate_transaction_number()
+        
+        # Create transaction header
+        transaction = TransactionHeader(
+            transaction_number=transaction_number,
+            transaction_type=TransactionType.PURCHASE,
+            transaction_date=purchase_data.purchase_date,
+            customer_id=str(purchase_data.supplier_id),  # supplier_id maps to customer_id
+            location_id=str(purchase_data.location_id),
+            status=TransactionStatus.COMPLETED,
+            payment_status=PaymentStatus.PENDING,
+            notes=purchase_data.notes,
+            reference_number=purchase_data.reference_number,
+            subtotal=Decimal("0"),
+            tax_amount=Decimal("0"),
+            discount_amount=Decimal("0"),
+            total_amount=Decimal("0"),
+            paid_amount=Decimal("0"),
+            created_by=str(UUID("00000000-0000-0000-0000-000000000000")),  # System user
+            updated_by=str(UUID("00000000-0000-0000-0000-000000000000"))
         )
         
-        # Build summaries
-        summaries = []
-        for transaction in transactions:
-            supplier_name = None
-            if transaction.customer_id:
-                supplier = await self.supplier_repository.get_by_id(UUID(transaction.customer_id))
-                supplier_name = supplier.company_name if supplier else None
-            
-            location_name = None
-            if transaction.location_id:
-                location = await self.location_repository.get_by_id(UUID(transaction.location_id))
-                location_name = location.name if location else None
-            
-            summary = PurchaseTransactionSummary(
-                id=transaction.id,
-                transaction_number=transaction.transaction_number,
-                transaction_date=transaction.transaction_date,
-                supplier_name=supplier_name,
-                location_name=location_name,
-                status=transaction.status.value,
-                payment_status=transaction.payment_status.value,
-                total_amount=transaction.total_amount,
-                item_count=len(transaction.transaction_lines),
-                created_at=transaction.created_at
-            )
-            summaries.append(summary)
+        self.session.add(transaction)
+        await self.session.flush()
         
-        return summaries
+        # Create transaction lines and calculate totals
+        line_number = 1
+        subtotal = Decimal("0")
+        total_tax = Decimal("0")
+        total_discount = Decimal("0")
+        
+        for item_data in purchase_data.items:
+            # Get item details for description
+            item = await self.item_repository.get_by_id(UUID(item_data.item_id))
+            
+            # Calculate line amounts
+            line_subtotal = Decimal(str(item_data.quantity)) * Decimal(str(item_data.unit_cost))
+            tax_amount = (line_subtotal * Decimal(str(item_data.tax_rate or 0))) / 100
+            discount_amount = Decimal(str(item_data.discount_amount or 0))
+            line_total = line_subtotal + tax_amount - discount_amount
+            
+            # Create transaction line
+            line = TransactionLine(
+                transaction_id=transaction.id,
+                line_number=line_number,
+                item_id=str(item_data.item_id),
+                quantity=Decimal(str(item_data.quantity)),
+                unit_price=Decimal(str(item_data.unit_cost)),
+                tax_rate=Decimal(str(item_data.tax_rate or 0)),
+                tax_amount=tax_amount,
+                discount_amount=discount_amount,
+                line_total=line_total,
+                description=f"{item.item_name} (Condition: {item_data.condition})",
+                notes=item_data.notes
+            )
+            
+            self.session.add(line)
+            
+            # Update totals
+            subtotal += line_subtotal
+            total_tax += tax_amount
+            total_discount += discount_amount
+            line_number += 1
+            
+            # Update stock levels
+            await self._update_stock_for_purchase(
+                item_id=UUID(item_data.item_id),
+                location_id=purchase_data.location_id,
+                quantity=Decimal(str(item_data.quantity)),
+                transaction_id=transaction.id,
+                condition=item_data.condition
+            )
+        
+        # Update transaction totals
+        transaction.subtotal = subtotal
+        transaction.tax_amount = total_tax
+        transaction.discount_amount = total_discount
+        transaction.total_amount = subtotal + total_tax - total_discount
+        
+        await self.session.commit()
+        
+        # Return response
+        return NewPurchaseResponse(
+            success=True,
+            message="Purchase created successfully",
+            transaction_id=transaction.id,
+            transaction_number=transaction.transaction_number,
+            data={
+                "id": str(transaction.id),
+                "transaction_number": transaction.transaction_number,
+                "transaction_type": transaction.transaction_type.value,
+                "transaction_date": transaction.transaction_date.isoformat(),
+                "supplier_id": transaction.customer_id,
+                "location_id": transaction.location_id,
+                "status": transaction.status.value,
+                "payment_status": transaction.payment_status.value,
+                "subtotal": float(transaction.subtotal),
+                "tax_amount": float(transaction.tax_amount),
+                "discount_amount": float(transaction.discount_amount),
+                "total_amount": float(transaction.total_amount),
+                "transaction_lines": [
+                    {
+                        "id": str(line.id),
+                        "line_number": line.line_number,
+                        "item_id": line.item_id,
+                        "quantity": float(line.quantity),
+                        "unit_price": float(line.unit_price),
+                        "tax_rate": float(line.tax_rate),
+                        "tax_amount": float(line.tax_amount),
+                        "discount_amount": float(line.discount_amount),
+                        "line_total": float(line.line_total),
+                        "description": line.description
+                    }
+                    for line in transaction.transaction_lines
+                ]
+            }
+        )
+    
+    async def _generate_transaction_number(self) -> str:
+        """Generate unique transaction number."""
+        date_str = datetime.now().strftime("%Y%m%d")
+        
+        # Get count of purchases today
+        start_of_day = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        query = select(func.count(TransactionHeader.id)).where(
+            and_(
+                TransactionHeader.transaction_type == TransactionType.PURCHASE,
+                TransactionHeader.created_at >= start_of_day
+            )
+        )
+        result = await self.session.execute(query)
+        count = result.scalar() or 0
+        
+        return f"PUR-{date_str}-{count + 1:04d}"
+    
+    async def _update_stock_for_purchase(
+        self,
+        item_id: UUID,
+        location_id: UUID,
+        quantity: Decimal,
+        transaction_id: UUID,
+        condition: str
+    ):
+        """Update stock levels for a purchase."""
+        # Get or create stock level
+        stock_level = await self.stock_level_repository.get_by_item_and_location(
+            item_id, location_id
+        )
+        
+        if not stock_level:
+            # Create new stock level
+            stock_level = await self.stock_level_repository.create_stock_level(
+                item_id=item_id,
+                location_id=location_id,
+                quantity_on_hand=quantity,
+                quantity_available=quantity
+            )
+        else:
+            # Update existing stock level
+            stock_level.quantity_on_hand += quantity
+            stock_level.quantity_available += quantity
+        
+        # Create stock movement record
+        await self.stock_movement_repository.create_movement(
+            item_id=item_id,
+            location_id=location_id,
+            movement_type=MovementType.PURCHASE,
+            quantity_change=quantity,
+            reference_type=ReferenceType.TRANSACTION,
+            reference_id=str(transaction_id),
+            notes=f"Purchase transaction - Condition: {condition}",
+            quantity_before=stock_level.quantity_on_hand - quantity,
+            quantity_after=stock_level.quantity_on_hand
+        )
+        
+        await self.session.commit()

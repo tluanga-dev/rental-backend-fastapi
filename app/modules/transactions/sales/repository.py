@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, update
 from sqlalchemy.orm import selectinload
 
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionHeader,
     TransactionLine,
     TransactionType,

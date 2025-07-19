@@ -4,7 +4,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, ConfigDict, field_validator, computed_field, model_validator
 from uuid import UUID
 
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionType,
     TransactionStatus,
     PaymentMethod,

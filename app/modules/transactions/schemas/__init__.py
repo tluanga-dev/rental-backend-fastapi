@@ -39,9 +39,7 @@ __all__ = [
     "ReturnValidationResponse", 
     "ReturnDetailsResponse",
     "ReturnStatusUpdate",
-    "ReturnWorkflowState",
-    "RentalInspectionCreate",
-    "RentalInspectionResponse",
+    "ReturnWorkflowState", 
     "PurchaseCreditMemoCreate", 
     "PurchaseCreditMemoResponse"
 ]

@@ -9,7 +9,7 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionHeader, 
     TransactionLine,
     RentalLifecycle

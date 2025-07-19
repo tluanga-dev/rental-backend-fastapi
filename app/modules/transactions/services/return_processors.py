@@ -9,14 +9,16 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.transactions.models import TransactionHeader, TransactionLine
+from app.modules.transactions.base.models import TransactionHeader, TransactionLine
 from app.modules.transactions.schemas.returns import (
     ReturnTransactionCreate,
     SaleReturnCreate,
     PurchaseReturnCreate,
-    RentalReturnCreate,
     SaleReturnLineItem,
     PurchaseReturnLineItem,
+)
+from app.modules.transactions.rental_returns.schemas import (
+    RentalReturnCreate,
     RentalReturnLineItem
 )
 from app.core.errors import ValidationError

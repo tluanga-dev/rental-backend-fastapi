@@ -1,6 +1,6 @@
 # Transactions module
 
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionHeader,
     TransactionLine,
     TransactionType,

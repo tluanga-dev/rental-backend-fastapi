@@ -8,7 +8,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionHeader, 
     TransactionLine,
     TransactionType,
@@ -16,7 +16,8 @@ from app.modules.transactions.models import (
     LineItemType
 )
 from app.modules.transactions.models.metadata import TransactionMetadata
-from app.modules.transactions.models.inspections import RentalInspection, PurchaseCreditMemo
+from app.modules.transactions.models.inspections import PurchaseCreditMemo
+from app.modules.transactions.rental_returns.models import RentalInspection
 from app.modules.transactions.schemas import (
     TransactionHeaderCreate,
     TransactionLineCreate,
@@ -26,16 +27,18 @@ from app.modules.transactions.schemas.returns import (
     ReturnTransactionCreate,
     SaleReturnCreate,
     PurchaseReturnCreate,
-    RentalReturnCreate,
     ReturnDetailsResponse,
     ReturnValidationResponse,
-    RentalInspectionCreate,
-    RentalInspectionResponse,
     PurchaseCreditMemoCreate,
     PurchaseCreditMemoResponse,
     ReturnWorkflowState,
     SaleReturnDetails,
     PurchaseReturnDetails,
+)
+from app.modules.transactions.rental_returns.schemas import (
+    RentalReturnCreate,
+    RentalInspectionCreate,
+    RentalInspectionResponse,
     RentalReturnDetails
 )
 from app.modules.transactions.services.return_processors import (

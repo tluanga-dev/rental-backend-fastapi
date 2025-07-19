@@ -14,8 +14,8 @@ from uuid import uuid4
 from app.db.base import BaseModel, UUIDType
 
 if TYPE_CHECKING:
-    from app.modules.transactions.models.transaction_headers import TransactionHeader
-    from app.modules.transactions.models.transaction_lines import TransactionLine
+    from .transaction_headers import TransactionHeader
+    from .transaction_lines import TransactionLine
 
 
 class ReturnEventType(PyEnum):

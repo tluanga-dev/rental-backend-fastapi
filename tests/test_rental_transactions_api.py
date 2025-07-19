@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.main import app
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionHeader,
     TransactionType,
     TransactionStatus,

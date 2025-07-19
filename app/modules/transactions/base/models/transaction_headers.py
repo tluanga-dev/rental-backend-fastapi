@@ -13,9 +13,9 @@ from uuid import uuid4
 from app.db.base import BaseModel, UUIDType
 
 if TYPE_CHECKING:
-    from app.modules.transactions.models.lines import TransactionLine
-    from app.modules.transactions.models.rental_lifecycle import RentalLifecycle
-    from app.modules.transactions.models.metadata import TransactionMetadata
+    from .transaction_lines import TransactionLine
+    from .rental_lifecycle import RentalLifecycle
+    from .metadata import TransactionMetadata
 
 
 # Transaction Type Enum

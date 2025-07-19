@@ -22,6 +22,7 @@ from .transaction_lines import (
 # Import additional models
 from .metadata import TransactionMetadata
 from .inspections import RentalInspection, PurchaseCreditMemo
+from .events import TransactionEvent
 from .rental_lifecycle import (
     RentalLifecycle, 
     RentalReturnEvent, 
@@ -49,6 +50,7 @@ __all__ = [
     
     # Additional models
     "TransactionMetadata",
+    "TransactionEvent",
     "RentalInspection",
     "PurchaseCreditMemo",
     

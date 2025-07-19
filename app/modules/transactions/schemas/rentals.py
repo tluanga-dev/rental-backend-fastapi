@@ -8,7 +8,7 @@ from datetime import datetime, date, time
 from decimal import Decimal
 from pydantic import BaseModel, Field, ConfigDict
 
-from app.modules.transactions.models import RentalStatus, ReturnEventType, InspectionCondition
+from app.modules.transactions.base.models import RentalStatus, ReturnEventType, InspectionCondition
 
 
 # Base schemas

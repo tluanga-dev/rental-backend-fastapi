@@ -21,12 +21,13 @@ from app.modules.master_data.item_master.models import Item
 from app.modules.suppliers.models import Supplier
 from app.modules.customers.models import Customer
 from app.modules.inventory.models import InventoryUnit, StockLevel, SKUSequence
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionHeader, TransactionLine, TransactionMetadata,
-    RentalInspection, PurchaseCreditMemo, RentalLifecycle,
-    RentalReturnEvent, RentalItemInspection, RentalStatusLog
+    PurchaseCreditMemo, RentalLifecycle,
+    RentalItemInspection, RentalStatusLog
 )
-from app.modules.transactions.models.events import TransactionEvent
+from app.modules.transactions.rental_returns.models import RentalInspection, RentalReturnEvent
+from app.modules.transactions.base.models.events import TransactionEvent
 from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
 from app.modules.system.models import SystemSetting, SystemBackup, AuditLog
 from app.modules.auth.routes import router as auth_router
@@ -35,11 +36,7 @@ from app.modules.master_data.routes import router as master_data_router
 from app.modules.suppliers.routes import router as suppliers_router
 from app.modules.customers.routes import router as customers_router
 from app.modules.inventory.routes import router as inventory_router
-from app.modules.transactions.routes import router as transactions_router, returns_router
-from app.modules.transactions.purchase import purchase_router
-from app.modules.transactions.sales import sales_router
-from app.modules.transactions.rentals import rentals_router
-from app.modules.transactions.rental_returns import rental_returns_router
+from app.modules.transactions.routes import router as transactions_router
 from app.modules.analytics.routes import router as analytics_router
 from app.modules.system.routes import router as system_router
 
@@ -189,12 +186,7 @@ app.include_router(master_data_router, prefix="/api/master-data", tags=["Master 
 app.include_router(suppliers_router, prefix="/api/suppliers", tags=["Suppliers"])
 app.include_router(customers_router, prefix="/api/customers", tags=["Customers"])
 app.include_router(inventory_router, prefix="/api/inventory", tags=["Inventory"])
-app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions"])
-app.include_router(returns_router, prefix="/api/transactions", tags=["Returns"])
-app.include_router(purchase_router, prefix="/api", tags=["Purchases"])
-app.include_router(sales_router, prefix="/api", tags=["Sales"])
-app.include_router(rentals_router, prefix="/api", tags=["Rentals"])
-app.include_router(rental_returns_router, prefix="/api", tags=["Rental Returns"])
+app.include_router(transactions_router, prefix="/api", tags=["Transactions"])
 app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(system_router, prefix="/api/system", tags=["System"])
 app.include_router(monitoring_router)  # Performance monitoring endpoints

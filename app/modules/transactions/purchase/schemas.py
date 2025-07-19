@@ -10,7 +10,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from uuid import UUID
 
-from app.modules.transactions.models import TransactionType, TransactionStatus, PaymentStatus
+from app.modules.transactions.base.models import TransactionType, TransactionStatus, PaymentStatus
 
 
 # Nested response schemas for purchase details

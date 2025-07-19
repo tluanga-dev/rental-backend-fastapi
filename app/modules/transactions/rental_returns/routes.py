@@ -27,7 +27,7 @@ from app.modules.transactions.schemas import TransactionWithLinesResponse
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 
 
-router = APIRouter(prefix="/rental-returns")
+router = APIRouter(tags=["rental-returns"])
 
 
 def get_rental_returns_service(session: AsyncSession = Depends(get_session)) -> RentalReturnsService:

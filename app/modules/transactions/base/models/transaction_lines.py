@@ -13,10 +13,10 @@ from uuid import uuid4
 from app.db.base import BaseModel, UUIDType
 
 if TYPE_CHECKING:
-    from app.modules.transactions.models.headers import TransactionHeader
+    from .transaction_headers import TransactionHeader
 
 # Import enums directly to avoid circular imports
-from app.modules.transactions.models.transaction_headers import RentalPeriodUnit, RentalStatus
+from .transaction_headers import RentalPeriodUnit, RentalStatus
 
 
 # Line Item Type Enum

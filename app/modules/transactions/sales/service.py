@@ -13,7 +13,7 @@ from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import selectinload
 
 from app.core.errors import NotFoundError, ValidationError, ConflictError
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionHeader,
     TransactionLine,
     TransactionType,

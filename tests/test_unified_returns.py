@@ -6,7 +6,7 @@ from decimal import Decimal
 from datetime import datetime, date, timedelta
 from uuid import uuid4
 
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionHeader,
     TransactionLine,
     TransactionType,

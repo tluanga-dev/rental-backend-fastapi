@@ -13,7 +13,7 @@ from sqlalchemy import select, and_, or_, func, update
 from sqlalchemy.orm import selectinload
 
 from app.core.errors import NotFoundError, ValidationError, ConflictError
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionHeader,
     TransactionLine,
     TransactionType,
@@ -21,8 +21,7 @@ from app.modules.transactions.models import (
     PaymentStatus,
     RentalStatus,
 )
-from app.modules.transactions.models.inspections import RentalInspection
-from app.modules.transactions.models.rental_lifecycle import RentalReturnEvent
+from app.modules.transactions.rental_returns.models import RentalInspection, RentalReturnEvent
 from app.modules.transactions.base.repository import TransactionHeaderRepository, TransactionLineRepository
 from app.modules.transactions.rental_returns.schemas import (
     RentalReturn,

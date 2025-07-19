@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.dependencies import get_session
 from app.modules.transactions.rentals.service import RentalsService
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionStatus,
     PaymentStatus,
     RentalStatus,
@@ -28,7 +28,7 @@ from app.modules.transactions.rentals.schemas import (
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 
 
-router = APIRouter(prefix="/rentals")
+router = APIRouter(tags=["rentals"])
 
 
 def get_rentals_service(session: AsyncSession = Depends(get_session)) -> RentalsService:

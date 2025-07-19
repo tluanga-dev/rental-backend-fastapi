@@ -30,7 +30,7 @@ from app.modules.suppliers.models import Supplier
 from app.modules.customers.models import Customer
 from app.modules.master_data.item_master.models import Item
 from app.modules.inventory.models import InventoryUnit, StockLevel, SKUSequence, StockMovement
-from app.modules.transactions.models import TransactionHeader, TransactionLine
+from app.modules.transactions.base.models import TransactionHeader, TransactionLine
 from app.modules.analytics.models import AnalyticsReport, BusinessMetric, SystemAlert
 from app.modules.system.models import SystemSetting, SystemBackup, AuditLog
 

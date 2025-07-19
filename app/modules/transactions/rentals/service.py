@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 from app.core.cache import cached, RentalCache, cache
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionHeader,
     TransactionLine,
     TransactionType,
@@ -173,8 +173,44 @@ class RentalsService:
                 customer = customers.get(UUID(transaction.customer_id)) if transaction.customer_id else None
                 location = locations.get(UUID(transaction.location_id)) if transaction.location_id else None
                 
+                # Convert transaction to dict with proper line serialization
+                transaction_dict = {
+                    "id": transaction.id,
+                    "transaction_number": transaction.transaction_number,
+                    "transaction_type": transaction.transaction_type,
+                    "transaction_date": transaction.transaction_date,
+                    "customer_id": transaction.customer_id,
+                    "location_id": transaction.location_id,
+                    "status": transaction.status,
+                    "payment_status": transaction.payment_status,
+                    "subtotal": transaction.subtotal,
+                    "tax_amount": transaction.tax_amount,
+                    "discount_amount": transaction.discount_amount,
+                    "total_amount": transaction.total_amount,
+                    "notes": transaction.notes,
+                    "created_at": transaction.created_at,
+                    "updated_at": transaction.updated_at,
+                    "transaction_lines": [
+                        {
+                            "id": line.id,
+                            "item_id": line.item_id,
+                            "quantity": line.quantity,
+                            "unit_price": line.unit_price,
+                            "tax_rate": line.tax_rate,
+                            "tax_amount": line.tax_amount,
+                            "discount_amount": line.discount_amount,
+                            "line_total": line.line_total,
+                            "description": line.description,
+                            "notes": line.notes,
+                            "created_at": line.created_at,
+                            "updated_at": line.updated_at,
+                        }
+                        for line in transaction.transaction_lines
+                    ]
+                }
+                
                 rental_response = RentalResponse.from_transaction(
-                    transaction.to_dict(),
+                    transaction_dict,
                     customer_details={"id": customer.id, "name": customer.name} if customer else None,
                     location_details={"id": location.id, "name": location.name} if location else None,
                     items_details=items
@@ -220,9 +256,45 @@ class RentalsService:
                     if item:
                         items[str(item.id)] = {"id": item.id, "name": item.item_name}
 
+            # Convert transaction to dict with proper line serialization
+            transaction_dict = {
+                "id": transaction.id,
+                "transaction_number": transaction.transaction_number,
+                "transaction_type": transaction.transaction_type,
+                "transaction_date": transaction.transaction_date,
+                "customer_id": transaction.customer_id,
+                "location_id": transaction.location_id,
+                "status": transaction.status,
+                "payment_status": transaction.payment_status,
+                "subtotal": transaction.subtotal,
+                "tax_amount": transaction.tax_amount,
+                "discount_amount": transaction.discount_amount,
+                "total_amount": transaction.total_amount,
+                "notes": transaction.notes,
+                "created_at": transaction.created_at,
+                "updated_at": transaction.updated_at,
+                "transaction_lines": [
+                    {
+                        "id": line.id,
+                        "item_id": line.item_id,
+                        "quantity": line.quantity,
+                        "unit_price": line.unit_price,
+                        "tax_rate": line.tax_rate,
+                        "tax_amount": line.tax_amount,
+                        "discount_amount": line.discount_amount,
+                        "line_total": line.line_total,
+                        "description": line.description,
+                        "notes": line.notes,
+                        "created_at": line.created_at,
+                        "updated_at": line.updated_at,
+                    }
+                    for line in transaction.transaction_lines
+                ]
+            }
+            
             # Transform to rental response
             return RentalResponse.from_transaction(
-                transaction.to_dict(),
+                transaction_dict,
                 customer_details={"id": customer.id, "name": customer.name} if customer else None,
                 location_details={"id": location.id, "name": location.name} if location else None,
                 items_details=items
@@ -387,10 +459,38 @@ class RentalsService:
             # Get complete transaction for response
             result = await self.transaction_repository.get_with_lines(transaction.id)
 
+            # Convert result to dict for response
+            result_dict = {
+                "id": str(result.id),
+                "transaction_number": result.transaction_number,
+                "transaction_type": result.transaction_type.value,
+                "transaction_date": result.transaction_date.isoformat(),
+                "customer_id": result.customer_id,
+                "location_id": result.location_id,
+                "status": result.status.value,
+                "payment_status": result.payment_status.value,
+                "subtotal": float(result.subtotal),
+                "tax_amount": float(result.tax_amount),
+                "discount_amount": float(result.discount_amount),
+                "total_amount": float(result.total_amount),
+                "transaction_lines": [
+                    {
+                        "id": str(line.id),
+                        "line_number": line.line_number,
+                        "item_id": line.item_id,
+                        "quantity": float(line.quantity),
+                        "unit_price": float(line.unit_price),
+                        "line_total": float(line.line_total),
+                        "description": line.description
+                    }
+                    for line in result.transaction_lines
+                ]
+            }
+            
             return NewRentalResponse(
                 success=True,
                 message="Rental transaction created successfully (optimized)",
-                data=result.to_dict(),
+                data=result_dict,
                 transaction_id=transaction.id,
                 transaction_number=transaction.transaction_number,
             )
@@ -814,8 +914,44 @@ class RentalsService:
                 if item:
                     items[str(item.id)] = {"id": item.id, "name": item.item_name}
         
+        # Convert transaction to dict with proper line serialization
+        transaction_dict = {
+            "id": transaction.id,
+            "transaction_number": transaction.transaction_number,
+            "transaction_type": transaction.transaction_type,
+            "transaction_date": transaction.transaction_date,
+            "customer_id": transaction.customer_id,
+            "location_id": transaction.location_id,
+            "status": transaction.status,
+            "payment_status": transaction.payment_status,
+            "subtotal": transaction.subtotal,
+            "tax_amount": transaction.tax_amount,
+            "discount_amount": transaction.discount_amount,
+            "total_amount": transaction.total_amount,
+            "notes": transaction.notes,
+            "created_at": transaction.created_at,
+            "updated_at": transaction.updated_at,
+            "transaction_lines": [
+                {
+                    "id": line.id,
+                    "item_id": line.item_id,
+                    "quantity": line.quantity,
+                    "unit_price": line.unit_price,
+                    "tax_rate": line.tax_rate,
+                    "tax_amount": line.tax_amount,
+                    "discount_amount": line.discount_amount,
+                    "line_total": line.line_total,
+                    "description": line.description,
+                    "notes": line.notes,
+                    "created_at": line.created_at,
+                    "updated_at": line.updated_at,
+                }
+                for line in transaction.transaction_lines
+            ]
+        }
+        
         return RentalResponse.from_transaction(
-            transaction.to_dict(),
+            transaction_dict,
             customer_details={"id": customer.id, "name": customer.name} if customer else None,
             location_details={"id": location.id, "name": location.name} if location else None,
             items_details=items

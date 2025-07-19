@@ -54,6 +54,8 @@ class RentalReturnLineItem(ReturnLineItemBase):
     beyond_normal_wear: bool = Field(default=False)
 
 
+
+
 # Base return transaction schema
 class ReturnTransactionBase(BaseModel):
     """Base schema for all return transactions."""
@@ -124,6 +126,8 @@ class PurchaseReturnCreate(ReturnTransactionBase):
             if not has_supplier_fault:
                 raise ValueError("Quality claim requires at least one item marked as supplier fault")
         return self
+
+
 
 
 # Rental return specific schema
@@ -323,91 +327,6 @@ class ReturnWorkflowState(str):
     CANCELLED = "CANCELLED"
 
 
-# Inspection workflow schemas
-class RentalInspectionLineItem(BaseModel):
-    """Individual line item inspection for rental returns."""
-    
-    line_id: UUID = Field(..., description="Return line item ID")
-    item_id: UUID = Field(..., description="Item being inspected")
-    inventory_unit_id: Optional[UUID] = Field(None, description="Specific unit if tracked")
-    
-    # Inspection results
-    condition_rating: Literal["EXCELLENT", "GOOD", "FAIR", "POOR", "DAMAGED"] = Field(...)
-    functionality_status: Literal["WORKING", "PARTIAL", "NOT_WORKING"] = Field(...)
-    cleanliness_level: Literal["CLEAN", "MINOR_CLEANING", "MAJOR_CLEANING"] = Field(...)
-    
-    # Damage assessment
-    has_damage: bool = Field(default=False)
-    damage_type: Optional[Literal["COSMETIC", "FUNCTIONAL", "STRUCTURAL", "MISSING_PARTS"]] = Field(None)
-    damage_severity: Optional[Literal["MINOR", "MODERATE", "MAJOR", "TOTAL_LOSS"]] = Field(None)
-    damage_description: Optional[str] = Field(None, max_length=1000)
-    damage_photos: List[str] = Field(default_factory=list, description="Photo URLs")
-    
-    # Cost estimates
-    repair_cost_estimate: Optional[Decimal] = Field(None, ge=0)
-    cleaning_cost_estimate: Optional[Decimal] = Field(None, ge=0)
-    replacement_cost: Optional[Decimal] = Field(None, ge=0)
-    
-    # Recommendations
-    recommended_action: Literal["RETURN_TO_STOCK", "REPAIR_FIRST", "DEEP_CLEANING", "DISPOSAL", "REPLACEMENT"] = Field(...)
-    inspector_notes: Optional[str] = Field(None, max_length=1000)
-    
-    @model_validator(mode='after')
-    def validate_damage_details(self):
-        """Validate damage details are provided when damage is reported."""
-        if self.has_damage:
-            if not self.damage_type or not self.damage_severity:
-                raise ValueError("Damage type and severity required when damage is reported")
-            if self.damage_severity in ["MAJOR", "TOTAL_LOSS"] and not self.repair_cost_estimate:
-                raise ValueError("Repair cost estimate required for major damage")
-        return self
-
-
-class RentalInspectionCreate(BaseModel):
-    """Create rental return inspection."""
-    
-    return_id: UUID = Field(..., description="Return transaction ID")
-    inspector_id: UUID = Field(..., description="User performing inspection")
-    inspection_date: datetime = Field(default_factory=datetime.utcnow)
-    
-    # Overall assessment
-    overall_condition: Literal["EXCELLENT", "GOOD", "FAIR", "POOR"] = Field(...)
-    inspection_passed: bool = Field(..., description="Does the return pass inspection?")
-    
-    # Line item inspections
-    line_inspections: List[RentalInspectionLineItem] = Field(..., min_length=1)
-    
-    # Summary calculations
-    total_repair_cost: Optional[Decimal] = Field(None, ge=0)
-    total_cleaning_cost: Optional[Decimal] = Field(None, ge=0)
-    total_deductions: Optional[Decimal] = Field(None, ge=0)
-    deposit_refund_amount: Optional[Decimal] = Field(None, ge=0)
-    
-    # Additional notes
-    general_notes: Optional[str] = Field(None, max_length=2000)
-    customer_notification_required: bool = Field(default=False)
-    follow_up_actions: List[str] = Field(default_factory=list)
-
-
-class RentalInspectionResponse(BaseModel):
-    """Rental inspection response."""
-    
-    id: UUID
-    return_id: UUID
-    inspector_id: UUID
-    inspection_date: datetime
-    overall_condition: str
-    inspection_passed: bool
-    line_inspections: List[RentalInspectionLineItem]
-    total_repair_cost: Decimal
-    total_cleaning_cost: Decimal
-    total_deductions: Decimal
-    deposit_refund_amount: Decimal
-    general_notes: Optional[str]
-    customer_notification_required: bool
-    follow_up_actions: List[str]
-    created_at: datetime
-    updated_at: datetime
 
 
 # Purchase return credit memo schemas

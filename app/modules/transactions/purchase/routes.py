@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.dependencies import get_session
 from app.modules.transactions.purchase.service import PurchaseService
-from app.modules.transactions.models import (
+from app.modules.transactions.base.models import (
     TransactionStatus,
     PaymentStatus,
 )
@@ -25,7 +25,7 @@ from app.modules.transactions.purchase.schemas import (
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 
 
-router = APIRouter(prefix="/purchases", tags=["purchases"])
+router = APIRouter(tags=["purchases"])
 
 
 def get_purchase_service(session: AsyncSession = Depends(get_session)) -> PurchaseService:

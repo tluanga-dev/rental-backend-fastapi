@@ -9,7 +9,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.transactions.models import TransactionHeader
+from app.modules.transactions.base.models import TransactionHeader
 from app.modules.transactions.schemas.returns import ReturnWorkflowState
 import logging
 logger = logging.getLogger(__name__)
