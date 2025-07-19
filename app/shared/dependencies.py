@@ -196,7 +196,7 @@ async def get_inventory_repository(session: AsyncSessionDep):
 
 async def get_transaction_repository(session: AsyncSessionDep):
     """Get transaction repository instance."""
-    from app.modules.transactions.repository import TransactionRepository
+    from app.modules.transactions.base.repository import TransactionRepository
     return TransactionRepository(session)
 
 

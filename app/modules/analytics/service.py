@@ -22,7 +22,7 @@ from app.modules.analytics.schemas import (
     SystemHealthSummary, AlertAcknowledgeRequest, AlertResolveRequest,
     MetricValueUpdate, ReportGenerationRequest
 )
-from app.modules.transactions.repository import TransactionHeaderRepository
+from app.modules.transactions.base.repository import TransactionHeaderRepository
 from app.modules.customers.repository import CustomerRepository
 from app.modules.inventory.repository import ItemRepository, InventoryUnitRepository
 

@@ -30,19 +30,9 @@ from app.modules.transactions.schemas import (
     StatusUpdate,
     DiscountApplication,
     ReturnProcessing,
-    RentalPeriodUpdate,
-    RentalReturn,
     TransactionSummary,
     TransactionReport,
     TransactionSearch,
-    PurchaseResponse,
-    NewPurchaseRequest,
-    NewPurchaseResponse,
-    NewRentalRequest,
-    NewRentalResponse,
-    NewSaleRequest,
-    NewSaleResponse,
-    RentableItemResponse,
 )
 from app.core.errors import NotFoundError, ValidationError, ConflictError
 
@@ -70,280 +60,19 @@ async def create_transaction(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
-@router.get("/purchases", response_model=List[PurchaseResponse])
-async def get_purchase_transactions(
-    skip: int = Query(0, ge=0, description="Number of items to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of items to return"),
-    date_from: Optional[date] = Query(None, description="Purchase date from (inclusive)"),
-    date_to: Optional[date] = Query(None, description="Purchase date to (inclusive)"),
-    amount_from: Optional[Decimal] = Query(None, ge=0, description="Minimum total amount"),
-    amount_to: Optional[Decimal] = Query(None, ge=0, description="Maximum total amount"),
-    supplier_id: Optional[UUID] = Query(None, description="Filter by supplier ID"),
-    status: Optional[TransactionStatus] = Query(None, description="Transaction status"),
-    payment_status: Optional[PaymentStatus] = Query(None, description="Payment status"),
-    service: TransactionService = Depends(get_transaction_service),
-):
-    """
-    Get purchase transactions with filtering options.
-    
-    Filters:
-    - date_from/date_to: Filter by purchase date range
-    - amount_from/amount_to: Filter by total amount range
-    - supplier_id: Filter by specific supplier
-    - status: Filter by transaction status
-    - payment_status: Filter by payment status
-    
-    Returns list of purchase transactions with purchase-specific line item format.
-    """
-    return await service.get_purchase_transactions(
-        skip=skip,
-        limit=limit,
-        date_from=date_from,
-        date_to=date_to,
-        amount_from=amount_from,
-        amount_to=amount_to,
-        supplier_id=supplier_id,
-        status=status,
-        payment_status=payment_status,
-    )
 
 
-@router.get("/purchases/{purchase_id}", response_model=PurchaseResponse)
-async def get_purchase_by_id(
-    purchase_id: UUID, service: TransactionService = Depends(get_transaction_service)
-):
-    """Get a single purchase transaction by ID with purchase-specific format."""
-    try:
-        return await service.get_purchase_by_id(purchase_id)
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
-@router.post(
-    "/new-rental", response_model=NewRentalResponse, status_code=status.HTTP_201_CREATED
-)
-async def create_new_rental(
-    rental_data: NewRentalRequest,
-    service: TransactionService = Depends(get_transaction_service),
-):
-    """
-    Create a new rental transaction with the simplified format.
-
-    This endpoint accepts rental data in the exact format sent by the frontend:
-    - transaction_date as string in YYYY-MM-DD format
-    - customer_id as string UUID (must exist and be able to transact)
-    - location_id as string UUID (must exist)
-    - payment_method as string (CASH, CARD, BANK_TRANSFER, CHECK, ONLINE)
-    - payment_reference as string (optional)
-    - notes as string (optional)
-    - items array with:
-      * item_id as string UUID (must exist and be rentable)
-      * quantity as integer (>=0, allows reservations)
-      * rental_period_value as integer (>=0, number of days)
-      * tax_rate as decimal (0-100, optional)
-      * discount_amount as decimal (>=0, optional)
-      * rental_start_date as string YYYY-MM-DD (item-specific)
-      * rental_end_date as string YYYY-MM-DD (item-specific, must be after start)
-      * notes as string (optional)
-
-    Features:
-    - Automatically fetches rental rates from item master data
-    - Generates unique transaction numbers (REN-YYYYMMDD-XXXX)
-    - Supports item-level rental date management
-    - Comprehensive validation at header and line levels
-
-    Returns a standardized response with success status, message, transaction data, and identifiers.
-    """
-    try:
-        return await service.create_new_rental(rental_data)
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
-    except ConflictError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}",
-        )
 
 
-@router.post(
-    "/new-rental-optimized", response_model=NewRentalResponse, status_code=status.HTTP_201_CREATED
-)
-async def create_new_rental_optimized(
-    rental_data: NewRentalRequest,
-    service: TransactionService = Depends(get_transaction_service),
-):
-    """
-    Create a new rental transaction with optimized batch processing.
-    
-    This is the optimized version of the new-rental endpoint that eliminates
-    the 30+ second timeout issues by implementing:
-    
-    - Batch validation of all items in a single query
-    - Bulk stock level lookups instead of individual queries
-    - Single database transaction for all operations
-    - Reduced database commits from N+1 to 1
-    
-    Expected performance improvement: 30+ seconds to <2 seconds (93% faster)
-    
-    Same input format as /new-rental but with dramatically improved performance.
-    """
-    try:
-        return await service.create_new_rental_optimized(rental_data)
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
-    except ConflictError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}",
-        )
-
-
-@router.post(
-    "/new-sale", response_model=NewSaleResponse, status_code=status.HTTP_201_CREATED
-)
-async def create_new_sale(
-    sale_data: NewSaleRequest,
-    service: TransactionService = Depends(get_transaction_service),
-):
-    """
-    Create a new sale transaction with the simplified format.
-
-    This endpoint accepts sale data in the exact format sent by the frontend:
-    - customer_id as string UUID (must exist and be able to transact)
-    - transaction_date as string in YYYY-MM-DD format
-    - notes as string (optional)
-    - reference_number as string (optional, max 50 chars)
-    - items array with:
-      * item_id as string UUID (must exist and be saleable)
-      * quantity as integer (>=1, required)
-      * unit_cost as decimal (>=0, price per unit)
-      * tax_rate as decimal (0-100, optional, defaults to 0)
-      * discount_amount as decimal (>=0, optional, defaults to 0)
-      * notes as string (optional)
-
-    Features:
-    - Automatically validates customer can transact
-    - Generates unique transaction numbers (SAL-YYYYMMDD-XXXX)
-    - Updates inventory stock levels and marks units as sold
-    - Creates stock movement records for audit trail
-    - Supports item-level discounts and taxes
-    - Comprehensive validation at header and line levels
-
-    Returns a standardized response with success status, message, transaction data, and identifiers.
-    """
-    try:
-        return await service.create_new_sale(sale_data)
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
-    except ConflictError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}",
-        )
 
 
 # This route has been moved up in the file to avoid route conflicts
 
 
-@router.get("/rentals", response_model=List[Dict[str, Any]])
-async def get_rental_transactions(
-    skip: int = Query(0, ge=0, description="Number of items to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of items to return"),
-    customer_id: Optional[UUID] = Query(None, description="Filter by customer ID"),
-    location_id: Optional[UUID] = Query(None, description="Filter by location ID"),
-    status: Optional[TransactionStatus] = Query(None, description="Filter by transaction status"),
-    rental_status: Optional[RentalStatus] = Query(None, description="Filter by rental status"),
-    date_from: Optional[date] = Query(None, description="Filter by rental start date (from)"),
-    date_to: Optional[date] = Query(None, description="Filter by rental end date (to)"),
-    overdue_only: bool = Query(False, description="Show only overdue rentals"),
-    service: TransactionService = Depends(get_transaction_service),
-):
-    """
-    Get rental transactions with comprehensive filtering options.
-    
-    This endpoint provides rental-specific filtering and includes lifecycle information:
-    - Filter by customer, location, transaction status, or rental status
-    - Filter by rental date range (start/end dates)
-    - Show only overdue rentals
-    - Includes rental lifecycle information (current status, fees, etc.)
-    - Supports pagination
-    
-    Filters:
-    - customer_id: Filter by specific customer UUID
-    - location_id: Filter by specific location UUID  
-    - status: Filter by transaction status (DRAFT, CONFIRMED, COMPLETED, etc.)
-    - rental_status: Filter by rental status (ACTIVE, LATE, PARTIAL_RETURN, etc.)
-    - date_from/date_to: Filter by rental start/end date range
-    - overdue_only: Show only rentals that are past their end date
-    
-    Returns list of rental transactions with lifecycle information.
-    """
-    try:
-        return await service.get_rental_transactions(
-            skip=skip,
-            limit=limit,
-            customer_id=customer_id,
-            location_id=location_id,
-            status=status,
-            rental_status=rental_status,
-            date_from=date_from,
-            date_to=date_to,
-            overdue_only=overdue_only,
-        )
-    except (NotFoundError, ValidationError) as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving rental transactions: {str(e)}",
-        )
 
 
-# Rentable items endpoint
-@router.get("/rentable-items", response_model=List[RentableItemResponse])
-async def get_rentable_items(
-    location_id: Optional[UUID] = Query(None, description="Filter by specific location"),
-    category_id: Optional[UUID] = Query(None, description="Filter by category"),
-    skip: int = Query(0, ge=0, description="Number of items to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of items to return"),
-    service: TransactionService = Depends(get_transaction_service),
-):
-    """
-    Get rentable items with current stock availability by location.
-    
-    This endpoint returns all items that are:
-    - Marked as rentable (is_rentable=True)
-    - Active status
-    - Have available quantity > 0 in at least one location
-    
-    The response includes:
-    - Item details (SKU, name, rental rate, security deposit)
-    - Total available quantity across all locations
-    - Breakdown of availability by location
-    - Related information (brand, category, unit of measurement)
-    
-    Use this endpoint when building rental forms to show available items.
-    """
-    return await service.get_rentable_items_with_availability(
-        location_id=location_id,
-        category_id=category_id,
-        skip=skip,
-        limit=limit
-    )
 
 
 @router.get("/{transaction_id}", response_model=TransactionHeaderResponse)
@@ -527,19 +256,6 @@ async def mark_transaction_overdue(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
-@router.post("/{transaction_id}/rental-return", response_model=TransactionHeaderResponse)
-async def complete_rental_return(
-    transaction_id: UUID,
-    return_data: RentalReturn,
-    service: TransactionService = Depends(get_transaction_service),
-):
-    """Complete rental return."""
-    try:
-        return await service.complete_rental_return(transaction_id, return_data)
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
 # Transaction Line endpoints
@@ -643,19 +359,6 @@ async def process_line_return(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
-@router.post("/lines/{line_id}/rental-period", response_model=TransactionLineResponse)
-async def update_rental_period(
-    line_id: UUID,
-    period_update: RentalPeriodUpdate,
-    service: TransactionService = Depends(get_transaction_service),
-):
-    """Update rental period for transaction line."""
-    try:
-        return await service.update_rental_period(line_id, period_update)
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
 # Reporting endpoints
@@ -702,116 +405,11 @@ async def get_outstanding_transactions(
     return await service.get_outstanding_transactions()
 
 
-@router.get("/reports/due-for-return", response_model=List[TransactionHeaderListResponse])
-async def get_rental_transactions_due_for_return(
-    as_of_date: Optional[date] = Query(None, description="As of date"),
-    service: TransactionService = Depends(get_transaction_service),
-):
-    """Get rental transactions due for return."""
-    return await service.get_rental_transactions_due_for_return(as_of_date)
 
 
 
 
 # Purchase-specific endpoints (POST /purchases removed, keeping /new-purchase)
 
-@router.get("/purchase-returns/purchase/{purchase_id}")
-async def get_purchase_returns(
-    purchase_id: UUID,
-    service: TransactionService = Depends(get_transaction_service),
-):
-    """
-    Get all return transactions for a specific purchase.
-    
-    This endpoint retrieves all return transactions that reference
-    the given purchase transaction ID.
-    """
-    try:
-        # Get the original purchase transaction
-        purchase_txn = await service.get_transaction(purchase_id)
-        
-        # Handle both enum and string values
-        transaction_type_value = purchase_txn.transaction_type
-        if hasattr(transaction_type_value, 'value'):
-            transaction_type_value = transaction_type_value.value
-            
-        if transaction_type_value != "PURCHASE":
-            raise ValidationError(f"Transaction {purchase_id} is not a purchase transaction")
-        
-        # Get all return transactions that reference this purchase
-        returns = await service.transaction_repository.get_all_with_lines(
-            reference_transaction_id=purchase_id,
-            transaction_type=TransactionType.RETURN,
-            active_only=True
-        )
-        
-        # Transform to response format
-        return_list = []
-        for return_txn in returns:
-            return_list.append({
-                "id": return_txn.id,
-                "transaction_number": return_txn.transaction_number,
-                "transaction_date": return_txn.transaction_date,
-                "status": return_txn.status,
-                "total_amount": float(return_txn.total_amount),
-                "items_returned": len(return_txn.transaction_lines),
-                "created_at": return_txn.created_at
-            })
-        
-        return {
-            "purchase_id": purchase_id,
-            "purchase_number": purchase_txn.transaction_number,
-            "returns": return_list,
-            "total_returns": len(return_list)
-        }
-        
-    except NotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
-    except ValidationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting purchase returns: {str(e)}"
-        )
 
 
-@router.post(
-    "/new-purchase", response_model=NewPurchaseResponse, status_code=status.HTTP_201_CREATED
-)
-async def create_new_purchase(
-    purchase_data: NewPurchaseRequest,
-    service: TransactionService = Depends(get_transaction_service),
-):
-    """
-    Create a new purchase transaction with the simplified format.
-
-    This endpoint accepts purchase data in the exact format sent by the frontend:
-    - supplier_id as string UUID
-    - location_id as string UUID
-    - purchase_date as string in YYYY-MM-DD format
-    - notes as string (can be empty)
-    - reference_number as string (can be empty)
-    - items array with item_id as string, quantity, unit_cost, tax_rate, discount_amount, condition, notes
-
-    Returns a standardized response with success status, message, transaction data, and identifiers.
-    """
-    try:
-        return await service.create_new_purchase(purchase_data)
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
-    except ConflictError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}",
-        )
