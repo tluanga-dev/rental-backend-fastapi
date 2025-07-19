@@ -421,9 +421,21 @@ class StockLevel(BaseModel):
     @property
     def display_name(self) -> str:
         """Get stock level display name."""
-        if self.item and self.location:
-            return f"{self.item.item_name} @ {self.location.location_name}"
-        return f"Stock Level {self.id}"
+        item_name = "Unknown Item"
+        location_name = "Unknown Location"
+        
+        # Check if relationships are loaded
+        if hasattr(self, 'item') and self.item:
+            item_name = self.item.item_name
+        elif hasattr(self, 'item_id') and self.item_id:
+            item_name = f"Item {self.item_id}"
+            
+        if hasattr(self, 'location') and self.location:
+            location_name = self.location.location_name
+        elif hasattr(self, 'location_id') and self.location_id:
+            location_name = f"Location {self.location_id}"
+            
+        return f"{item_name} @ {location_name}"
     
     def __str__(self) -> str:
         """String representation of stock level."""

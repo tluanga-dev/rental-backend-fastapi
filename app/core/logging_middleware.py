@@ -65,9 +65,10 @@ class TransactionLoggingMiddleware(BaseHTTPMiddleware):
         
         # Transaction-related endpoints that need special tracking
         self.transaction_endpoints = [
-            "/api/transactions/new-sale",
-            "/api/transactions/new-purchase", 
-            "/api/transactions/new-rental",
+            "/api/transactions/sales/new",
+            "/api/transactions/purchases/new", 
+            "/api/transactions/rentals/new",
+            "/api/transactions/rental-returns/",
             "/api/rentals/",
             "/api/transactions/",
         ]
@@ -215,20 +216,21 @@ class TransactionLoggingMiddleware(BaseHTTPMiddleware):
             log_data["username"] = context["username"]
             
         # Add request body for transaction requests if enabled
-        if is_transaction and self.include_request_body:
-            try:
-                body = await self._get_request_body(request)
-                if body and len(body) <= self.max_body_size:
-                    # Try to parse as JSON for better logging
-                    try:
-                        log_data["request_body"] = json.loads(body)
-                    except json.JSONDecodeError:
-                        log_data["request_body"] = body[:self.max_body_size]
-                elif body:
-                    log_data["request_body_truncated"] = True
-                    log_data["request_body_size"] = len(body)
-            except Exception as e:
-                log_data["request_body_error"] = str(e)
+        # Temporarily disabled for debugging - body consumption causes issues
+        # if is_transaction and self.include_request_body:
+        #     try:
+        #         body = await self._get_request_body(request)
+        #         if body and len(body) <= self.max_body_size:
+        #             # Try to parse as JSON for better logging
+        #             try:
+        #                 log_data["request_body"] = json.loads(body)
+        #             except json.JSONDecodeError:
+        #                 log_data["request_body"] = body[:self.max_body_size]
+        #         elif body:
+        #             log_data["request_body_truncated"] = True
+        #             log_data["request_body_size"] = len(body)
+        #     except Exception as e:
+        #         log_data["request_body_error"] = str(e)
                 
         # Log with appropriate level
         if is_transaction:
@@ -392,7 +394,7 @@ class TransactionLoggingMiddleware(BaseHTTPMiddleware):
             
     async def _get_request_body(self, request: Request) -> Optional[bytes]:
         """
-        Extract request body safely.
+        Extract request body safely and cache it for reuse.
         
         Args:
             request: HTTP request
@@ -401,7 +403,13 @@ class TransactionLoggingMiddleware(BaseHTTPMiddleware):
             Request body as bytes or None
         """
         try:
+            # Check if body was already read and cached
+            if hasattr(request, '_body'):
+                return request._body
+            
+            # Read and cache the body for later use by the endpoint
             body = await request.body()
+            request._body = body
             return body
         except Exception:
             return None

@@ -32,6 +32,7 @@ from app.modules.master_data.locations.repository import LocationRepository
 from app.modules.master_data.item_master.repository import ItemMasterRepository
 from app.modules.inventory.repository import StockLevelRepository, StockMovementRepository
 from app.modules.inventory.models import MovementType, ReferenceType
+from app.modules.inventory.schemas import StockLevelCreate
 
 
 class PurchaseService:
@@ -92,24 +93,57 @@ class PurchaseService:
         result = await self.session.execute(query)
         transactions = result.scalars().all()
         
+        # Batch load all related data to avoid N+1 queries
+        # Collect all unique IDs
+        supplier_ids = set()
+        location_ids = set()
+        item_ids = set()
+        
+        for transaction in transactions:
+            if transaction.customer_id:
+                supplier_ids.add(UUID(transaction.customer_id))
+            if transaction.location_id:
+                location_ids.add(UUID(transaction.location_id))
+            for line in transaction.transaction_lines:
+                if line.item_id:
+                    item_ids.add(UUID(line.item_id))
+        
+        # Batch load suppliers
+        suppliers_map = {}
+        if supplier_ids:
+            suppliers = await self.supplier_repository.get_by_ids(list(supplier_ids))
+            suppliers_map = {supplier.id: supplier for supplier in suppliers}
+        
+        # Batch load locations
+        locations_map = {}
+        if location_ids:
+            locations = await self.location_repository.get_by_ids(list(location_ids))
+            locations_map = {location.id: location for location in locations}
+        
+        # Batch load items
+        items_map = {}
+        if item_ids:
+            items = await self.item_repository.get_by_ids(list(item_ids))
+            items_map = {item.id: item for item in items}
+        
         # Transform to purchase response format
         purchase_responses = []
         for transaction in transactions:
-            # Get supplier details
+            # Get supplier details from map
             supplier = None
             if transaction.customer_id:
-                supplier = await self.supplier_repository.get_by_id(UUID(transaction.customer_id))
+                supplier = suppliers_map.get(UUID(transaction.customer_id))
             
-            # Get location details
+            # Get location details from map
             location = None
             if transaction.location_id:
-                location = await self.location_repository.get_by_id(UUID(transaction.location_id))
+                location = locations_map.get(UUID(transaction.location_id))
                 
-            # Get item details for each line
+            # Get item details for each line from map
             items_details = {}
             for line in transaction.transaction_lines:
                 if line.item_id:
-                    item = await self.item_repository.get_by_id(UUID(line.item_id))
+                    item = items_map.get(UUID(line.item_id))
                     if item:
                         items_details[str(line.item_id)] = {
                             "id": item.id,
@@ -238,7 +272,11 @@ class PurchaseService:
     
     async def create_new_purchase(self, purchase_data: NewPurchaseRequest) -> NewPurchaseResponse:
         """Create a new purchase transaction."""
+        print("DEBUG: Service method called")
+        print(f"DEBUG: purchase_data type: {type(purchase_data)}")
+        print(f"DEBUG: purchase_data: {purchase_data}")
         # Validate supplier exists
+        print("Creating new purchase with data: inside the service", purchase_data)
         supplier = await self.supplier_repository.get_by_id(purchase_data.supplier_id)
         if not supplier:
             raise NotFoundError(f"Supplier with ID {purchase_data.supplier_id} not found")
@@ -265,7 +303,7 @@ class PurchaseService:
             customer_id=str(purchase_data.supplier_id),  # supplier_id maps to customer_id
             location_id=str(purchase_data.location_id),
             status=TransactionStatus.COMPLETED,
-            payment_status=PaymentStatus.PENDING,
+            payment_status=PaymentStatus.PENDING.value,
             notes=purchase_data.notes,
             reference_number=purchase_data.reference_number,
             subtotal=Decimal("0"),
@@ -273,8 +311,8 @@ class PurchaseService:
             discount_amount=Decimal("0"),
             total_amount=Decimal("0"),
             paid_amount=Decimal("0"),
-            created_by=str(UUID("00000000-0000-0000-0000-000000000000")),  # System user
-            updated_by=str(UUID("00000000-0000-0000-0000-000000000000"))
+            created_by="00000000-0000-0000-0000-000000000000",  # System user
+            updated_by="00000000-0000-0000-0000-000000000000"
         )
         
         self.session.add(transaction)
@@ -287,14 +325,17 @@ class PurchaseService:
         total_discount = Decimal("0")
         
         for item_data in purchase_data.items:
+            print(f"DEBUG: Processing item {item_data.item_id}")
             # Get item details for description
             item = await self.item_repository.get_by_id(UUID(item_data.item_id))
+            print(f"DEBUG: Retrieved item: {item}")
             
             # Calculate line amounts
             line_subtotal = Decimal(str(item_data.quantity)) * Decimal(str(item_data.unit_cost))
             tax_amount = (line_subtotal * Decimal(str(item_data.tax_rate or 0))) / 100
             discount_amount = Decimal(str(item_data.discount_amount or 0))
             line_total = line_subtotal + tax_amount - discount_amount
+            print(f"DEBUG: Line calculations done")
             
             # Create transaction line
             line = TransactionLine(
@@ -334,7 +375,16 @@ class PurchaseService:
         transaction.discount_amount = total_discount
         transaction.total_amount = subtotal + total_tax - total_discount
         
-        await self.session.commit()
+        print(f"DEBUG: About to commit transaction")
+        try:
+            await self.session.commit()
+            print(f"DEBUG: Commit successful")
+        except Exception as e:
+            print(f"DEBUG: Commit failed: {e}")
+            print(f"DEBUG: Exception type: {type(e)}")
+            import traceback
+            print(f"DEBUG: Traceback: {traceback.format_exc()}")
+            raise
         
         # Return response
         return NewPurchaseResponse(
@@ -350,7 +400,7 @@ class PurchaseService:
                 "supplier_id": transaction.customer_id,
                 "location_id": transaction.location_id,
                 "status": transaction.status.value,
-                "payment_status": transaction.payment_status.value,
+                "payment_status": transaction.payment_status,
                 "subtotal": float(transaction.subtotal),
                 "tax_amount": float(transaction.tax_amount),
                 "discount_amount": float(transaction.discount_amount),
@@ -400,34 +450,42 @@ class PurchaseService:
     ):
         """Update stock levels for a purchase."""
         # Get or create stock level
-        stock_level = await self.stock_level_repository.get_by_item_and_location(
+        stock_level = await self.stock_level_repository.get_by_item_location(
             item_id, location_id
         )
         
-        if not stock_level:
+        if stock_level is None:
             # Create new stock level
-            stock_level = await self.stock_level_repository.create_stock_level(
+            stock_data = StockLevelCreate(
                 item_id=item_id,
                 location_id=location_id,
                 quantity_on_hand=quantity,
                 quantity_available=quantity
             )
+            stock_level = await self.stock_level_repository.create(stock_data)
         else:
             # Update existing stock level
             stock_level.quantity_on_hand += quantity
             stock_level.quantity_available += quantity
         
         # Create stock movement record
-        await self.stock_movement_repository.create_movement(
-            item_id=item_id,
-            location_id=location_id,
-            movement_type=MovementType.PURCHASE,
-            quantity_change=quantity,
-            reference_type=ReferenceType.TRANSACTION,
-            reference_id=str(transaction_id),
-            notes=f"Purchase transaction - Condition: {condition}",
-            quantity_before=stock_level.quantity_on_hand - quantity,
-            quantity_after=stock_level.quantity_on_hand
-        )
-        
-        await self.session.commit()
+        movement_data = {
+            "stock_level_id": stock_level.id,
+            "item_id": str(item_id),
+            "location_id": str(location_id),
+            "movement_type": MovementType.PURCHASE.value,
+            "quantity_change": quantity,
+            "reference_type": ReferenceType.TRANSACTION.value,
+            "reference_id": str(transaction_id),
+            "reason": f"Purchase transaction - Condition: {condition}",
+            "notes": f"Purchase transaction - Condition: {condition}",
+            "quantity_before": stock_level.quantity_on_hand - quantity,
+            "quantity_after": stock_level.quantity_on_hand
+        }
+        await self.stock_movement_repository.create(movement_data)
+    
+    async def get_purchase_returns(self, purchase_id: UUID) -> List[Dict[str, Any]]:
+        """Get all return transactions for a specific purchase."""
+        # For now, return empty list as returns functionality is not implemented
+        # This method prevents the endpoint from failing
+        return []

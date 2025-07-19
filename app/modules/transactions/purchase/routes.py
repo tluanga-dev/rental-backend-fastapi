@@ -103,6 +103,7 @@ async def create_new_purchase(
     Returns a standardized response with success status, message, transaction data, and identifiers.
     """
     try:
+        print("Creating new purchase with data:", purchase_data)
         return await service.create_new_purchase(purchase_data)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -111,6 +112,10 @@ async def create_new_purchase(
     except ConflictError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except Exception as e:
+        import traceback
+        print(f"ERROR: Full exception details: {e}")
+        print(f"ERROR: Exception type: {type(e)}")
+        print(f"ERROR: Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}",

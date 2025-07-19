@@ -92,6 +92,7 @@ class TransactionHeader(BaseModel):
     # Transaction categorization
     transaction_type = Column(Enum(TransactionType), nullable=False, comment="Type of transaction")
     status = Column(Enum(TransactionStatus), nullable=False, default=TransactionStatus.PENDING, comment="Current status")
+    payment_status = Column(String(20), nullable=True, comment="Payment status")
     
     # Temporal information
     transaction_date = Column(DateTime, nullable=False, default=datetime.utcnow, comment="Transaction date and time")
@@ -124,6 +125,7 @@ class TransactionHeader(BaseModel):
     
     # Additional information
     notes = Column(Text, nullable=True, comment="Additional notes")
+    reference_number = Column(String(50), nullable=True, comment="External reference number")
     payment_method = Column(String(20), nullable=True, comment="Payment method")
     payment_reference = Column(String(100), nullable=True, comment="Payment reference")
     return_workflow_state = Column(String(50), nullable=True, comment="Return workflow state")
@@ -180,9 +182,8 @@ class TransactionHeader(BaseModel):
         """Check if transaction is fully paid."""
         return self.paid_amount >= self.total_amount
     
-    @property
-    def payment_status(self):
-        """Determine payment status."""
+    def compute_payment_status(self):
+        """Compute payment status based on amounts (for validation/comparison)."""
         if self.paid_amount == 0:
             return PaymentStatus.PENDING
         elif self.paid_amount >= self.total_amount:

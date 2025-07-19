@@ -30,6 +30,15 @@ class BaseRepository(Generic[ModelType]):
         result = await self.session.get(self.model, id)
         return result
     
+    async def get_by_ids(self, ids: List[UUID]) -> List[ModelType]:
+        """Get multiple records by IDs."""
+        if not ids:
+            return []
+        
+        query = select(self.model).where(self.model.id.in_(ids))
+        result = await self.session.execute(query)
+        return result.scalars().all()
+    
     async def get_all(
         self,
         skip: int = 0,

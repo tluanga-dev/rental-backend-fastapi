@@ -67,6 +67,15 @@ class ItemMasterRepository:
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
+    async def get_by_ids(self, item_ids: List[UUID]) -> List[Item]:
+        """Get multiple items by IDs."""
+        if not item_ids:
+            return []
+        
+        query = select(Item).where(Item.id.in_(item_ids))
+        result = await self.session.execute(query)
+        return result.scalars().all()
+    
     async def get_by_id_with_relations(self, item_id: UUID) -> Optional[Item]:
         """Get item by ID with relationships loaded."""
         query = (

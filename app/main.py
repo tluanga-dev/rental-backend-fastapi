@@ -36,7 +36,7 @@ from app.modules.master_data.routes import router as master_data_router
 from app.modules.suppliers.routes import router as suppliers_router
 from app.modules.customers.routes import router as customers_router
 from app.modules.inventory.routes import router as inventory_router
-# from app.modules.transactions.routes import router as transactions_router  # Commented out to clean up Swagger
+from app.modules.transactions.routes import router as transactions_router  # Re-enabled for Swagger
 from app.modules.analytics.routes import router as analytics_router
 from app.modules.system.routes import router as system_router
 
@@ -92,6 +92,30 @@ app = FastAPI(
             "description": "Inventory management operations"
         },
         {
+            "name": "Transactions",
+            "description": "All transaction management operations"
+        },
+        {
+            "name": "Purchases",
+            "description": "Purchase transaction management operations"
+        },
+        {
+            "name": "Sales",
+            "description": "Sales transaction management operations"
+        },
+        {
+            "name": "Rentals",
+            "description": "Rental transaction management operations"
+        },
+        {
+            "name": "Rental Returns",
+            "description": "Rental return and inspection management operations"
+        },
+        {
+            "name": "Transaction Queries",
+            "description": "Cross-module transaction queries and reports"
+        },
+        {
             "name": "Analytics",
             "description": "Analytics and reporting operations"
         },
@@ -136,6 +160,18 @@ async def custom_http_exception_handler(request: Request, exc: CustomHTTPExcepti
         content={"detail": exc.detail, "type": exc.error_type}
     )
 
+# Global exception handler for debugging UUID issue
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    print(f"GLOBAL ERROR: {exc}")
+    print(f"GLOBAL ERROR TYPE: {type(exc)}")
+    print(f"GLOBAL ERROR TRACEBACK: {traceback.format_exc()}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {str(exc)}"}
+    )
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
@@ -162,7 +198,7 @@ app.include_router(master_data_router, prefix="/api/master-data", tags=["Master 
 app.include_router(suppliers_router, prefix="/api/suppliers", tags=["Suppliers"])
 app.include_router(customers_router, prefix="/api/customers", tags=["Customers"])
 app.include_router(inventory_router, prefix="/api/inventory", tags=["Inventory"])
-# app.include_router(transactions_router, prefix="/api", tags=["Transactions"])  # Commented out to clean up Swagger
+app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions"])
 app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(system_router, prefix="/api/system", tags=["System"])
 app.include_router(monitoring_router)  # Performance monitoring endpoints

@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.dependencies import get_session
-from app.modules.transactions.rentals.service import RentalsService
+from app.modules.transactions.rentals.services import RentalsService
 from app.modules.transactions.base.models import (
     TransactionStatus,
     PaymentStatus,

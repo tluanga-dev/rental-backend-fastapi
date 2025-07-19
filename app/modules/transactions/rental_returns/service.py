@@ -33,7 +33,7 @@ from app.modules.transactions.rental_returns.schemas import (
     RentalDamageAssessment,
     RentalReturnFees,
 )
-from app.modules.transactions.rentals.service import RentalsService
+from app.modules.transactions.rentals.services import RentalsService
 from app.modules.customers.repository import CustomerRepository
 from app.modules.inventory.repository import ItemRepository, StockLevelRepository
 from app.modules.inventory.models import StockLevel, StockMovement, MovementType, ReferenceType

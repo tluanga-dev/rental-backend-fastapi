@@ -86,26 +86,16 @@ async def get_transactions(
     - /api/sales for sales transactions  
     - /api/rentals for rental transactions
     """
-    filters = {}
-    if transaction_type:
-        filters['transaction_type'] = transaction_type
-    if status:
-        filters['status'] = status
-    if payment_status:
-        filters['payment_status'] = payment_status
-    if customer_id:
-        filters['customer_id'] = str(customer_id)
-    if location_id:
-        filters['location_id'] = str(location_id)
-    if date_from:
-        filters['date_from'] = date_from
-    if date_to:
-        filters['date_to'] = date_to
-        
     return await repository.get_all(
         skip=skip,
         limit=limit,
-        filters=filters
+        transaction_type=transaction_type,
+        status=status,
+        payment_status=payment_status,
+        customer_id=customer_id,
+        location_id=location_id,
+        date_from=date_from,
+        date_to=date_to
     )
 
 

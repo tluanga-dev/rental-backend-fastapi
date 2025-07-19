@@ -22,7 +22,7 @@ from app.modules.transactions.rentals.schemas import (
     UnitOfMeasurementNested,
     RentalPeriodUpdate,
 )
-from app.modules.transactions.rentals.service import RentalsService
+from app.modules.transactions.rentals.services import RentalsService
 from app.modules.transactions.rentals.repository import RentalsRepository
 from app.modules.transactions.rentals.routes import router as rentals_router
 
